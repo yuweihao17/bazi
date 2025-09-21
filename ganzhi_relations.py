@@ -123,23 +123,6 @@ def analyze_dizhi_relations(dizhi: list) -> list:
                 for j in range(i+1, len(sanhe_list)):
                     formed_sanhe.add(tuple(sorted([sanhe_list[i], sanhe_list[j]])))
     
-    # 半合关系（只有在不形成三合的情况下才输出）
-    banhe_relations = [
-        (['申', '子'], '申子半合水局'),
-        (['子', '辰'], '子辰半合水局'),
-        (['寅', '午'], '寅午半合火局'),
-        (['午', '戌'], '午戌半合火局'),
-        (['亥', '卯'], '亥卯半合木局'),
-        (['卯', '未'], '卯未半合木局'),
-        (['巳', '酉'], '巳酉半合金局'),
-        (['酉', '丑'], '酉丑半合金局')
-    ]
-    
-    for pair, desc in banhe_relations:
-        if (pair[0] in dizhi_set and pair[1] in dizhi_set and 
-            tuple(sorted(pair)) not in formed_sanhe):
-            relations.append(desc)
-    
     # 土局特殊处理 - 需要辰戌丑未四个都有，或者至少有三个形成特定组合
     tu_zhi = ['辰', '戌', '丑', '未']
     found_tu = [zhi for zhi in tu_zhi if zhi in dizhi_set]
@@ -167,7 +150,30 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if all(zhi in dizhi_set for zhi in sanhui_list):
             relations.append(desc)
     
-    # 4. 暗合
+    # 4. 半合关系（只有在不形成三合的情况下才输出）
+    banhe_relations = [
+        (['申', '子'], '申子半合水局'),
+        (['子', '辰'], '子辰半合水局'),
+        (['寅', '午'], '寅午半合火局'),
+        (['午', '戌'], '午戌半合火局'),
+        (['亥', '卯'], '亥卯半合木局'),
+        (['卯', '未'], '卯未半合木局'),
+        (['巳', '酉'], '巳酉半合金局'),
+        (['酉', '丑'], '酉丑半合金局')
+    ]
+    
+    # 使用集合来去重
+    added_banhe = set()
+    for pair, desc in banhe_relations:
+        if (pair[0] in dizhi_set and pair[1] in dizhi_set and 
+            tuple(sorted(pair)) not in formed_sanhe):
+            # 避免重复添加相同的半合关系
+            sorted_pair = tuple(sorted(pair))
+            if sorted_pair not in added_banhe:
+                relations.append(desc)
+                added_banhe.add(sorted_pair)
+    
+    # 5. 暗合
     anhe_relations = [
         (['卯', '申'], '卯申暗合'),
         (['午', '亥'], '午亥暗合'),
@@ -179,7 +185,7 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if pair[0] in dizhi_set and pair[1] in dizhi_set:
             relations.append(desc)
     
-    # 5. 拱合
+    # 6. 拱合
     gonghe_checks = [
         (['申', '辰'], '申辰拱合子'),
         (['寅', '戌'], '寅戌拱合午'),
@@ -191,7 +197,7 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if all(zhi in dizhi_set for zhi in gonghe_list):
             relations.append(desc)
     
-    # 6. 相刑
+    # 7. 相刑
     # 子卯相刑
     if '子' in dizhi_set and '卯' in dizhi_set:
         relations.append('子卯相刑')
@@ -216,7 +222,7 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if count >= 2 and zhi in zixing_zhi:
             relations.append(f'{zhi}{zhi}自刑')
     
-    # 7. 六冲
+    # 8. 六冲
     liuchong_relations = [
         (['子', '午'], '子午相冲'),
         (['丑', '未'], '丑未相冲'),
@@ -230,7 +236,7 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if pair[0] in dizhi_set and pair[1] in dizhi_set:
             relations.append(desc)
     
-    # 8. 六破
+    # 9. 六破
     liupo_relations = [
         (['子', '酉'], '子酉相破'),
         (['寅', '亥'], '寅亥相破'),
@@ -244,7 +250,7 @@ def analyze_dizhi_relations(dizhi: list) -> list:
         if pair[0] in dizhi_set and pair[1] in dizhi_set:
             relations.append(desc)
     
-    # 9. 六害
+    # 10. 六害
     liuhai_relations = [
         (['子', '未'], '子未相害'),
         (['丑', '午'], '丑午相害'),
