@@ -336,6 +336,125 @@ def get_dayun_ages(start_age: int) -> List[int]:
     return ages
 
 
+def get_liunian_for_dayun(dayun_ganzhi: str, start_year: int, start_age: int) -> List[Tuple[str, int, int]]:
+    """
+    计算指定大运内的十年流年信息
+    
+    Args:
+        dayun_ganzhi: 大运干支
+        start_year: 开始年份
+        start_age: 开始年龄（实际走大运的年龄）
+        
+    Returns:
+        List[Tuple[str, int, int]]: 流年信息列表 (干支, 年份, 年龄)
+    """
+    # 六十花甲子的顺序
+    gan = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']
+    zhi = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
+    
+    # 生成六十甲子
+    jiazi = []
+    for i in range(60):
+        jiazi.append(gan[i % 10] + zhi[i % 12])
+    
+    liunian_list = []
+    
+    # 从起始年份开始，计算十年流年
+    for i in range(10):
+        year = start_year + i
+        age = start_age + i
+        
+        # 根据公历年份计算流年干支
+        jiazi_index = (year - 1984) % 60
+        if jiazi_index < 0:
+            jiazi_index += 60
+        
+        liunian_ganzhi = jiazi[jiazi_index]
+        liunian_list.append((liunian_ganzhi, year, age))
+    
+    return liunian_list
+
+
+def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int, int]]) -> None:
+    """
+    显示流年查询结果
+    
+    Args:
+        dayun_ganzhi: 大运干支
+        liunian_list: 流年信息列表
+    """
+    print("\n" + "=" * 50)
+    print(f"        {dayun_ganzhi}大运十年流年详情")
+    print("=" * 50)
+    print()
+    
+    # 显示表头
+    print("流年：", end="")
+    for liunian_ganzhi, _, _ in liunian_list:
+        print(f"{liunian_ganzhi:^6}", end="")
+    print()
+    
+    print("年份：", end="")
+    for _, year, _ in liunian_list:
+        print(f"{year:^6}", end="")
+    print()
+    
+    print("岁数：", end="")
+    for _, _, age in liunian_list:
+        print(f"{age:^6}", end="")
+    print()
+    
+    print("=" * 50)
+
+
+def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_start_age: int) -> None:
+    """
+    流年查询循环
+    
+    Args:
+        dayun_list: 大运列表
+        dayun_years: 大运年份列表
+        rounded_start_age: 起运年龄
+    """
+    print("\n" + "-" * 50)
+    print("流年查询功能：")
+    print(f"可查询的大运：{' '.join(dayun_list)}")
+    print("输入 'q' 或 'quit' 退出")
+    print()
+    
+    while True:
+        try:
+            user_input = input("请输入要查询的大运干支：").strip()
+            
+            if user_input.lower() in ['q', 'quit', '退出']:
+                print("流年查询已退出")
+                break
+            
+            if user_input in dayun_list:
+                # 找到对应的大运索引
+                dayun_index = dayun_list.index(user_input)
+                start_year = dayun_years[dayun_index]
+                
+                # 计算实际走大运的年龄（起运年龄 + 1 + 大运序号*10）
+                actual_start_age = rounded_start_age + 1 + dayun_index * 10
+                
+                # 计算该大运的流年信息
+                liunian_list = get_liunian_for_dayun(user_input, start_year, actual_start_age)
+                
+                # 显示流年结果
+                display_liunian_result(user_input, liunian_list)
+                print()
+            else:
+                print(f"❌ 请输入有效的大运干支：{' '.join(dayun_list)}")
+                
+        except KeyboardInterrupt:
+            print("\n流年查询已退出")
+            break
+        except EOFError:
+            print("\n流年查询已退出")
+            break
+
+
 def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
                         solar_time: str, lunar_time: str, gender: str, 
                         start_age: int, start_months: int, start_days: int, start_hours: int,
@@ -515,6 +634,9 @@ def main() -> None:
                 start_age, start_months, start_days, start_hours,
                 dayun_list, dayun_years, rounded_start_age
             )
+            
+            # 流年查询功能
+            liunian_query_loop(dayun_list, dayun_years, rounded_start_age)
             
         except Exception as e:
             print(f"\n❌ 大运计算错误：{e}")
