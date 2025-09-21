@@ -237,18 +237,204 @@ def get_lunar_input() -> Tuple[int, int, int, int]:
     return year, month, day, hour
 
 
-def display_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str) -> None:
+def format_lunar_day(day: int) -> str:
+    """
+    格式化农历日期，使用传统表达法
+    
+    Args:
+        day: 农历日期（1-30）
+        
+    Returns:
+        str: 格式化后的农历日期
+    """
+    if day == 1:
+        return "初一"
+    elif day == 2:
+        return "初二"
+    elif day == 3:
+        return "初三"
+    elif day == 4:
+        return "初四"
+    elif day == 5:
+        return "初五"
+    elif day == 6:
+        return "初六"
+    elif day == 7:
+        return "初七"
+    elif day == 8:
+        return "初八"
+    elif day == 9:
+        return "初九"
+    elif day == 10:
+        return "初十"
+    elif day == 11:
+        return "十一"
+    elif day == 12:
+        return "十二"
+    elif day == 13:
+        return "十三"
+    elif day == 14:
+        return "十四"
+    elif day == 15:
+        return "十五"
+    elif day == 16:
+        return "十六"
+    elif day == 17:
+        return "十七"
+    elif day == 18:
+        return "十八"
+    elif day == 19:
+        return "十九"
+    elif day == 20:
+        return "二十"
+    elif day == 21:
+        return "廿一"
+    elif day == 22:
+        return "廿二"
+    elif day == 23:
+        return "廿三"
+    elif day == 24:
+        return "廿四"
+    elif day == 25:
+        return "廿五"
+    elif day == 26:
+        return "廿六"
+    elif day == 27:
+        return "廿七"
+    elif day == 28:
+        return "廿八"
+    elif day == 29:
+        return "廿九"
+    elif day == 30:
+        return "三十"
+    else:
+        return str(day)
+
+
+def get_date_info_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[str, str]:
+    """
+    从公历日期获取公历和农历时间信息
+    
+    Args:
+        year: 公历年份
+        month: 公历月份
+        day: 公历日期
+        hour: 小时
+        
+    Returns:
+        Tuple[str, str]: (公历时间字符串, 农历时间字符串)
+    """
+    from lunar_python import Solar
+    
+    solar = Solar.fromYmdHms(year, month, day, hour, 0, 0)
+    lunar = solar.getLunar()
+    
+    # 公历时间
+    solar_str = f"{year}年{month}月{day}日 {hour:02d}:00"
+    
+    # 农历时间
+    lunar_year = lunar.getYear()
+    lunar_month = lunar.getMonth()
+    lunar_day = lunar.getDay()
+    # 尝试不同的方法获取闰月信息
+    try:
+        is_leap = lunar.getLeap()
+    except AttributeError:
+        try:
+            is_leap = lunar.isLeap()
+        except AttributeError:
+            # 如果都没有，尝试从月份名称判断
+            try:
+                month_str = str(lunar_month)
+                is_leap = "闰" in month_str
+            except:
+                is_leap = False
+    
+    leap_str = "闰" if is_leap else ""
+    day_str = format_lunar_day(lunar_day)
+    lunar_str = f"{lunar_year}年{leap_str}{lunar_month}月{day_str} {hour:02d}:00"
+    
+    return solar_str, lunar_str
+
+
+def get_date_info_from_lunar(year: int, month: int, day: int, hour: int) -> Tuple[str, str]:
+    """
+    从农历日期获取公历和农历时间信息
+    
+    Args:
+        year: 农历年份
+        month: 农历月份
+        day: 农历日期
+        hour: 小时
+        
+    Returns:
+        Tuple[str, str]: (公历时间字符串, 农历时间字符串)
+    """
+    from lunar_python import Lunar
+    
+    # 先尝试非闰月
+    try:
+        lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0, False)
+    except (TypeError, ValueError):
+        # 兼容旧版本或无闰月参数
+        try:
+            lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
+        except ValueError:
+            # 尝试闰月
+            try:
+                lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0, True)
+            except TypeError:
+                raise ValueError(f"农历日期无效: {year}年{month}月{day}日")
+    
+    solar = lunar.getSolar()
+    
+    # 公历时间
+    solar_year = solar.getYear()
+    solar_month = solar.getMonth()
+    solar_day = solar.getDay()
+    solar_str = f"{solar_year}年{solar_month}月{solar_day}日 {hour:02d}:00"
+    
+    # 农历时间
+    lunar_year = lunar.getYear()
+    lunar_month = lunar.getMonth()
+    lunar_day = lunar.getDay()
+    # 尝试不同的方法获取闰月信息
+    try:
+        is_leap = lunar.getLeap()
+    except AttributeError:
+        try:
+            is_leap = lunar.isLeap()
+        except AttributeError:
+            # 如果都没有，尝试从月份名称判断
+            try:
+                month_str = str(lunar_month)
+                is_leap = "闰" in month_str
+            except:
+                is_leap = False
+    
+    leap_str = "闰" if is_leap else ""
+    day_str = format_lunar_day(lunar_day)
+    lunar_str = f"{lunar_year}年{leap_str}{lunar_month}月{day_str} {hour:02d}:00"
+    
+    return solar_str, lunar_str
+
+
+def display_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str, 
+                  solar_time: str, lunar_time: str) -> None:
     """显示计算结果"""
-    print("\n" + "=" * 30)
+    print("\n" + "=" * 40)
     print("        计算结果")
-    print("=" * 30)
+    print("=" * 40)
+    print(f"公历时间：{solar_time}")
+    print(f"农历时间：{lunar_time}")
+    print("-" * 40)
     print(f"年柱：{year_pillar}")
     print(f"月柱：{month_pillar}")
     print(f"日柱：{day_pillar}")
     print(f"时柱：{hour_pillar}")
-    print("-" * 30)
+    print("-" * 40)
     print(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}")
-    print("=" * 30)
+    print("=" * 40)
 
 
 def main() -> None:
@@ -265,6 +451,7 @@ def main() -> None:
             year, month, day, hour = get_solar_input()
             try:
                 year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
+                solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
             except ValueError as e:
                 print(f"\n❌ 错误：{e}")
                 sys.exit(1)
@@ -272,11 +459,12 @@ def main() -> None:
             year, month, day, hour = get_lunar_input()
             try:
                 year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar_auto(year, month, day, hour)
+                solar_time, lunar_time = get_date_info_from_lunar(year, month, day, hour)
             except ValueError as e:
                 print(f"\n❌ 错误：{e}")
                 sys.exit(1)
 
-        display_result(year_pillar, month_pillar, day_pillar, hour_pillar)
+        display_result(year_pillar, month_pillar, day_pillar, hour_pillar, solar_time, lunar_time)
         
     except KeyboardInterrupt:
         print("\n\n程序已退出")
