@@ -10,9 +10,11 @@ from typing import Tuple, Optional, List
 from datetime import datetime, timedelta
 import bazi_common
 import importlib.util
+import ai_analyzer
 
 
 DEBUG = False
+CHART_COL_WIDTH = 14
 
 
 def debug_print(*args, **kwargs) -> None:
@@ -398,22 +400,49 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
                         start_age: int, start_months: int, start_days: int, start_hours: int,
                         dayun_list: List[str], dayun_years: List[int], rounded_start_age: int) -> None:
     """显示计算结果和大运信息"""
-    print("\n" + "=" * 50)
-    print("        四柱八字及大运计算结果")
-    print("=" * 50)
-    print(f"公历时间：{solar_time}")
-    print(f"农历时间：{lunar_time}")
-    print(f"性别：{gender}")
-    print("-" * 50)
-    print(f"年柱：{year_pillar}")
-    print(f"月柱：{month_pillar}")
-    print(f"日柱：{day_pillar}")
-    print(f"时柱：{hour_pillar}")
-    print("-" * 50)
-    print(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}")
-    print("-" * 50)
-    print(f"起大运时间：{start_age}岁{start_months}个月{start_days}天{start_hours}个时辰")
-    print("-" * 50)
+    title = "四柱八字及大运计算结果"
+    total_width = (CHART_COL_WIDTH * 4) + 6 # 4柱 + 左侧标签宽度
+    
+    print("\n" + "=" * total_width)
+    print(bazi_common.pad_str_to_center(title, total_width))
+    print("=" * total_width)
+
+    print(bazi_common.pad_str(f"公历时间：{solar_time}", total_width))
+    print(bazi_common.pad_str(f"农历时间：{lunar_time}", total_width))
+    print(bazi_common.pad_str(f"性别：{gender}", total_width))
+    
+    # 显示四柱八字
+    print("-" * total_width)
+    print(bazi_common.pad_str(f"年柱：{year_pillar}", total_width))
+    print(bazi_common.pad_str(f"月柱：{month_pillar}", total_width))
+    print(bazi_common.pad_str(f"日柱：{day_pillar}", total_width))
+    print(bazi_common.pad_str(f"时柱：{hour_pillar}", total_width))
+    print("-" * total_width)
+    print(bazi_common.pad_str(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}", total_width))
+    
+    # 添加原局干支关系分析
+    print("\n【原局作用关系】")
+    relations = "该功能仅在 bazi_calculator.py 中可用"
+    try:
+        from ganzhi_relations import analyze_ganzhi_relations
+        relations = analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar)
+    except ImportError:
+        pass
+    print(relations)
+    
+    # AI 解读原局
+    print("\n【AI智能解读】")
+    ai_analyzer.get_ai_interpretation("bazi_yuanju", {
+        "gender": gender, "year_pillar": year_pillar, "month_pillar": month_pillar,
+        "day_pillar": day_pillar, "day_master": day_pillar[0], "hour_pillar": hour_pillar,
+        "relations": relations
+    })
+
+    print("-" * total_width)
+    print(bazi_common.pad_str(f"起大运时间：{start_age}岁{start_months}个月{start_days}天{start_hours}个时辰", total_width))
+    print(bazi_common.pad_str(f"实际起运年份：{dayun_years[0]} 年，实际起运年龄：{rounded_start_age} 岁", total_width))
+    print("-" * total_width)
+    
     print("八部大运排列：")
     print()
     
@@ -423,16 +452,16 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
     years = dayun_years[:8]
     
     # 使用固定宽度格式化，确保对齐
-    headers_str = "".join([bazi_common.pad_str_to_center(h, 8) for h in headers])
+    headers_str = "".join([bazi_common.pad_str_to_center(h, CHART_COL_WIDTH // 2) for h in headers])
     print(f"大运：{headers_str}")
     
-    ages_str = "".join([bazi_common.pad_str_to_center(a, 8) for a in ages])
+    ages_str = "".join([bazi_common.pad_str_to_center(str(a), CHART_COL_WIDTH // 2) for a in ages])
     print(f"岁数：{ages_str}")
     
-    years_str = "".join([bazi_common.pad_str_to_center(y, 8) for y in years])
+    years_str = "".join([bazi_common.pad_str_to_center(str(y), CHART_COL_WIDTH // 2) for y in years])
     print(f"年份：{years_str}")
     
-    print("=" * 50)
+    print("=" * total_width)
 
 
 def main() -> None:
@@ -483,11 +512,11 @@ def main() -> None:
             
             # 计算起运时间
             start_age, start_months, start_days, start_hours, rounded_start_age = calculate_dayun_start_time(
-                birth_datetime, gender, year_stem
+                birth_datetime, gender, year_pillar
             )
             
             # 获取大运排列
-            dayun_list = get_dayun_sequence(month_pillar, gender, year_stem)
+            dayun_list = get_dayun_sequence(month_pillar, gender, year_pillar)
             
             # 计算对应年份（传统算法：出生年为0岁，实际起运年龄不需要+1）
             # 使用公历出生年份计算，因为传统0岁起算就是以实际出生年为准

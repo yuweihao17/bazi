@@ -7,8 +7,10 @@
 - 提供查询函数
 """
 
+from typing import Dict, List
+
 # 十二长生状态
-CHANGSHENG_STATES = [
+CHANGSHENG_STATES: List[str] = [
     "长生", "沐浴", "冠带", "临官", "帝旺", "衰", 
     "病", "死", "墓", "绝", "胎", "养"
 ]
@@ -16,7 +18,7 @@ CHANGSHENG_STATES = [
 # 十天干十二长生表
 # 数据来源：根据您提供的图片进行数字化
 # 阳干顺行，阴干逆行
-CHANGSHENG_MAP = {
+CHANGSHENG_MAP: Dict[str, Dict[str, str]] = {
     # 阳干
     '甲': {'亥': '长生', '子': '沐浴', '丑': '冠带', '寅': '临官', '卯': '帝旺', '辰': '衰', '巳': '病', '午': '死', '未': '墓', '申': '绝', '酉': '胎', '戌': '养'},
     '丙': {'寅': '长生', '卯': '沐浴', '辰': '冠带', '巳': '临官', '午': '帝旺', '未': '衰', '申': '病', '酉': '死', '戌': '墓', '亥': '绝', '子': '胎', '丑': '养'},
@@ -33,15 +35,13 @@ CHANGSHENG_MAP = {
 
 def get_changsheng_state(tian_gan: str, di_zhi: str) -> str:
     """
-    获取天干在地支的十二长生状态
-    
+    获取天干在指定地支的十二长生状态。
+
     Args:
-        tian_gan: 天干
-        di_zhi: 地支
-        
+        tian_gan: 天干 (e.g., "甲").
+        di_zhi: 地支 (e.g., "子").
+
     Returns:
-        str: 十二长生状态，如 "长生", "帝旺" 等
+        对应的十二长生状态字符串 (e.g., "沐浴")，如果未找到则返回空字符串。
     """
-    if tian_gan in CHANGSHENG_MAP and di_zhi in CHANGSHENG_MAP[tian_gan]:
-        return CHANGSHENG_MAP[tian_gan][di_zhi]
-    return ""
+    return CHANGSHENG_MAP.get(tian_gan, {}).get(di_zhi, "")

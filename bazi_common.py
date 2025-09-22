@@ -1,6 +1,6 @@
 
 import sys
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import importlib.util
 try:
@@ -8,18 +8,31 @@ try:
 except ImportError:
     wcswidth = None
 
+try:
+    from lunar_python import Lunar, LunarYear  # type: ignore
+except ImportError:
+    Lunar = None
+    LunarYear = None
+
 GAN = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸']
 ZHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥']
 JIAZI_CYCLE = [f"{GAN[i % 10]}{ZHI[i % 12]}" for i in range(60)]
 
-LUNAR_MONTH_NAMES = {
+LUNAR_MONTH_NAMES: Dict[int, str] = {
     1: "正月", 2: "二月", 3: "三月", 4: "四月", 5: "五月", 6: "六月",
     7: "七月", 8: "八月", 9: "九月", 10: "十月", 11: "冬月", 12: "腊月"
 }
 
-def format_lunar_dt_from_object(lunar_obj, hour: int) -> str:
+def format_lunar_dt_from_object(lunar_obj: Any, hour: int) -> str:
     """
-    根据lunar-python的Lunar对象，格式化完整的农历日期时间字符串
+    根据lunar-python的Lunar对象，格式化完整的农历日期时间字符串。
+
+    Args:
+        lunar_obj: lunar-python库中的Lunar实例。
+        hour: 当前的小时数。
+
+    Returns:
+        格式化后的农历日期时间字符串 (e.g., "2024年正月十五 14:00")。
     """
     year = lunar_obj.getYear()
     month = lunar_obj.getMonth()
@@ -38,7 +51,12 @@ def format_lunar_dt_from_object(lunar_obj, hour: int) -> str:
 def get_24_solar_terms(year: int) -> List[Tuple[str, datetime]]:
     """
     获取指定年份的二十四节气时间（使用近似平均日期）。
-    返回以日期排序的列表。
+
+    Args:
+        year: 公历年份。
+
+    Returns:
+        一个包含 (节气名, datetime对象) 的元组列表，按时间排序。
     """
     approximate_terms = [
         ("小寒", datetime(year, 1, 6, 0, 0)),
@@ -65,8 +83,17 @@ def calculate_dayun_start_time(
     debug: bool = False,
 ) -> Tuple[int, int, int, int, int]:
     """
-    计算大运起始时间（按“3天=1岁”），返回(年,月,日,时辰,四舍五入年龄)。
-    debug=True 时打印中间过程。
+    计算大运起始时间，遵循“3天=1岁”的传统规则。
+
+    Args:
+        birth_datetime: 包含公历年、月、日、时的datetime对象。
+        gender: 性别 ("男" or "女")。
+        year_stem: 出生年份的天干。
+        debug: 是否打印详细的计算过程。
+
+    Returns:
+        一个包含五个整数的元组：
+        (起运岁数, 起运月数, 起运日数, 起运时辰数, 用于计算大运年份的四舍五入岁数)。
     """
     yang_stems = ['甲', '丙', '戊', '庚', '壬']
     is_yang_year = year_stem in yang_stems
@@ -135,7 +162,17 @@ def calculate_dayun_start_time(
 
 
 def get_dayun_sequence(month_pillar: str, gender: str, year_stem: str) -> List[str]:
-    """生成八部大运顺序"""
+    """
+    根据月柱、性别和年干，生成八步大运的干支顺序。
+
+    Args:
+        month_pillar: 月柱的干支 (e.g., "甲子")。
+        gender: 性别 ("男" or "女")。
+        year_stem: 年柱的天干 (e.g., "癸")。
+
+    Returns:
+        一个包含八个干支字符串的列表，代表八步大运。
+    """
     try:
         current_index = JIAZI_CYCLE.index(month_pillar)
     except ValueError:
@@ -149,17 +186,44 @@ def get_dayun_sequence(month_pillar: str, gender: str, year_stem: str) -> List[s
 
 
 def calculate_dayun_years(birth_year: int, start_age: int) -> List[int]:
-    """按传统0岁起算，返回八部大运对应年份"""
+    """
+    根据出生年份和起运岁数，计算八步大运对应的公历年份。
+
+    Args:
+        birth_year: 公历出生年份。
+        start_age: 起运岁数（传统算法，0岁起）。
+
+    Returns:
+        一个包含八个公历年份的列表。
+    """
     return [birth_year + start_age + i * 10 for i in range(8)]
 
 
 def get_dayun_ages(start_age: int) -> List[int]:
-    """返回八部大运实际开始时的年龄（起运年龄+1，每步加10）"""
+    """
+    根据起运岁数，计算八步大运开始时的实际年龄。
+
+    Args:
+        start_age: 起运岁数（传统算法，0岁起）。
+
+    Returns:
+        一个包含八个年龄的列表。
+    """
     return [start_age + 1 + i * 10 for i in range(8)]
 
 
 def get_liunian_for_dayun(dayun_ganzhi: str, start_year: int, start_age: int) -> List[Tuple[str, int, int]]:
-    """计算指定大运内的十年流年 (干支, 年份, 年龄)"""
+    """
+    计算指定大运内的十年流年信息。
+
+    Args:
+        dayun_ganzhi: 大运的干支 (e.g., "甲子")。
+        start_year: 该大运开始的公历年份。
+        start_age: 开始该大运时的实际年龄。
+
+    Returns:
+        一个包含 (流年干支, 公历年份, 年龄) 的元组列表。
+    """
     liunian_list: List[Tuple[str, int, int]] = []
     for i in range(10):
         year = start_year + i
@@ -173,7 +237,12 @@ def get_liunian_for_dayun(dayun_ganzhi: str, start_year: int, start_age: int) ->
 
 
 def ensure_dependencies(dependencies: List[Tuple[str, str]]) -> None:
-    """检查依赖库是否存在，如果不存在则提示安装并退出"""
+    """
+    检查指定的Python库是否已安装，如果未安装则打印安装提示并退出程序。
+
+    Args:
+        dependencies: 一个包含 (库名, 安装命令) 的元组列表。
+    """
     missing_deps = []
     for package_name, install_command in dependencies:
         if importlib.util.find_spec(package_name) is None:
@@ -186,12 +255,24 @@ def ensure_dependencies(dependencies: List[Tuple[str, str]]) -> None:
         sys.exit(1)
 
 def ensure_lunar_python() -> None:
-    """旧的依赖检查函数，重定向到新的通用函数"""
+    """
+    (旧版函数) 检查 `lunar-python` 库是否安装。
+    """
     ensure_dependencies([("lunar_python", "pip install lunar-python>=1.2.13")])
 
 
 def read_int(prompt: str, min_value: Optional[int] = None, max_value: Optional[int] = None) -> int:
-    """读取并验证整数输入"""
+    """
+    提示用户输入一个整数，并进行范围验证。
+
+    Args:
+        prompt: 显示给用户的提示信息。
+        min_value: 允许的最小值（包含）。
+        max_value: 允许的最大值（包含）。
+
+    Returns:
+        用户输入的有效整数。
+    """
     while True:
         try:
             s = input(prompt).strip()
@@ -214,7 +295,16 @@ def read_int(prompt: str, min_value: Optional[int] = None, max_value: Optional[i
 
 
 def read_choice(prompt: str, choices: List[str]) -> str:
-    """读取并验证选择输入"""
+    """
+    提示用户从给定选项中选择一个，支持大小写不敏感匹配。
+
+    Args:
+        prompt: 显示给用户的提示信息。
+        choices: 一个包含有效选项字符串的列表。
+
+    Returns:
+        用户选择的有效选项。
+    """
     while True:
         try:
             s = input(prompt).strip()
@@ -234,13 +324,23 @@ def read_choice(prompt: str, choices: List[str]) -> str:
 
 
 def get_gender_input() -> str:
-    """获取性别输入"""
+    """
+    提示用户输入性别（男/女）。
+
+    Returns:
+        用户选择的性别 ("男" or "女")。
+    """
     print("\n【性别信息】")
     return read_choice("请输入性别（男/女）：", ["男", "女"])
 
 
 def get_solar_input() -> Tuple[int, int, int, int]:
-    """获取公历输入"""
+    """
+    引导用户输入公历年、月、日、时，并进行基本验证。
+
+    Returns:
+        一个包含 (年, 月, 日, 小时) 的元组。
+    """
     print("\n【公历输入】")
     year = read_int("请输入公历年份（例如 2023）：", 1, 9999)
     month = read_int("请输入公历月份（1-12）：", 1, 12)
@@ -255,7 +355,12 @@ def get_solar_input() -> Tuple[int, int, int, int]:
 
 
 def get_lunar_input() -> Tuple[int, int, int, int]:
-    """获取农历输入，并处理闰月"""
+    """
+    引导用户输入农历年、月、日、时，并处理闰月及日期有效性校验。
+
+    Returns:
+        一个包含 (年, 月, 日, 小时) 的元组，其中月份若为闰月则为负数。
+    """
     print("\n【农历输入】")
     year = read_int("请输入农历年份（例如 2023）：", 1, 9999)
     month = read_int("请输入农历月份（1-12）：", 1, 12)
@@ -279,7 +384,9 @@ def get_lunar_input() -> Tuple[int, int, int, int]:
 
 
 def display_banner() -> None:
-    """显示程序标题和说明"""
+    """
+    显示程序的欢迎横幅和基本使用说明。
+    """
     print("=" * 60)
     print("           四柱八字及大运计算器")
     print("     支持公历与农历输入，自动计算大运")
@@ -293,7 +400,15 @@ def display_banner() -> None:
 
 
 def get_str_display_width(s: str) -> int:
-    """计算字符串的显示宽度，优先使用 wcwidth 库"""
+    """
+    计算字符串在终端中的显示宽度，优先使用 `wcwidth` 库以兼容中文字符。
+
+    Args:
+        s: 待计算的字符串。
+
+    Returns:
+        字符串的显示宽度。
+    """
     if wcswidth:
         # 使用 wcwidth 计算宽度，-1表示控制字符等，视为0
         return max(0, wcswidth(str(s)))
@@ -309,7 +424,16 @@ def get_str_display_width(s: str) -> int:
 
 
 def pad_str_to_center(s: str, total_width: int) -> str:
-    """将字符串在指定总宽度内居中"""
+    """
+    将字符串在指定的总宽度内进行居中对齐。
+
+    Args:
+        s: 待对齐的字符串。
+        total_width: 目标总宽度。
+
+    Returns:
+        经过居中对齐处理后的新字符串。
+    """
     s = str(s)
     current_width = get_str_display_width(s)
     if current_width >= total_width:
@@ -319,4 +443,21 @@ def pad_str_to_center(s: str, total_width: int) -> str:
     padding_left = padding_total // 2
     padding_right = padding_total - padding_left
     return ' ' * padding_left + s + ' ' * padding_right
+
+
+def pad_str(s: str, total_width: int) -> str:
+    """
+    将字符串进行左对齐，通过在右侧填充空格来达到指定的总显示宽度。
+
+    Args:
+        s: 待对齐的字符串。
+        total_width: 目标总宽度。
+
+    Returns:
+        经过左对齐处理后的新字符串。
+    """
+    s = str(s)
+    current_width = get_str_display_width(s)
+    padding = ' ' * max(0, total_width - current_width)
+    return s + padding
 
