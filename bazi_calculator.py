@@ -23,6 +23,10 @@ import importlib.util
 import shishen
 import changsheng
 
+# 新增 lunar_python 的 Solar 模块导入
+from lunar_python import Solar, Lunar
+
+
 DEBUG = False
 
 
@@ -358,8 +362,6 @@ def calc_bazi_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[st
     """
     从公历日期计算四柱八字
     """
-    from lunar_python import Solar
-
     try:
         solar = Solar.fromYmdHms(year, month, day, hour, 0, 0)
         lunar = solar.getLunar()
@@ -371,8 +373,6 @@ def calc_bazi_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[st
 
 def get_date_info_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[str, str]:
     """从公历获取日期信息，包括农历"""
-    from lunar_python import Solar  # type: ignore
-    
     solar = Solar.fromYmdHms(year, month, day, hour, 0, 0)
     lunar = solar.getLunar()
     
@@ -386,7 +386,6 @@ def calc_bazi_from_lunar(year: int, month: int, day: int, hour: int) -> Tuple[st
     """
     从农历日期计算四柱八字（闰月由负数月份表示）
     """
-    from lunar_python import Lunar
     try:
         lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
         ec = lunar.getEightChar()
@@ -431,8 +430,6 @@ def calc_bazi_from_lunar_auto(year: int, month: int, day: int, hour: int) -> Tup
 
 def get_date_info_from_lunar(year: int, month: int, day: int, hour: int) -> Tuple[str, str]:
     """从农历获取日期信息，包括公历"""
-    from lunar_python import Lunar  # type: ignore
-    
     lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
     solar = lunar.getSolar()
     
@@ -457,6 +454,140 @@ def display_banner() -> None:
     bazi_common.display_banner()
 
 
+def get_bazi_input_and_find_dates() -> Optional[Tuple[datetime, str]]:
+    """
+    获取用户输入的四柱八字，并在1800-2100年范围内查找所有匹配的日期。
+    返回用户选择的日期时间和性别。
+    """
+    print("\n请输入四柱八字进行反查（例如：年柱输入“癸卯”，月柱输入“甲子”等）")
+    
+    # 地支与小时的映射关系 (取小时范围的中间值)
+    ZHI_TO_HOUR = {
+        '子': 0, '丑': 2, '寅': 4, '卯': 6, '辰': 8, '巳': 10,
+        '午': 12, '未': 14, '申': 16, '酉': 18, '戌': 20, '亥': 22
+    }
+    
+    # 获取并验证输入
+    while True:
+        year_pillar = input("请输入年柱：").strip()
+        if year_pillar not in bazi_common.JIAZI_CYCLE:
+            print(f"❌ 年柱输入错误，请输入有效的干支组合。")
+            continue
+        break
+        
+    while True:
+        month_pillar = input("请输入月柱：").strip()
+        if month_pillar not in bazi_common.JIAZI_CYCLE:
+            print(f"❌ 月柱输入错误，请输入有效的干支组合。")
+            continue
+        break
+
+    while True:
+        day_pillar = input("请输入日柱：").strip()
+        if day_pillar not in bazi_common.JIAZI_CYCLE:
+            print(f"❌ 日柱输入错误，请输入有效的干支组合。")
+            continue
+        break
+
+    while True:
+        hour_pillar = input("请输入时柱：").strip()
+        if hour_pillar not in bazi_common.JIAZI_CYCLE:
+            print(f"❌ 时柱输入错误，请输入有效的干支组合。")
+            continue
+        if hour_pillar[1] not in ZHI_TO_HOUR:
+            print(f"❌ 时柱地支“{hour_pillar[1]}”无法识别，请输入有效的时柱。")
+            continue
+        break
+
+    target_hour = ZHI_TO_HOUR[hour_pillar[1]]
+    
+    print("\n正在优化算法并在 1800-2100 年间查找匹配的日期，请稍候...")
+    
+    found_dates = []
+    start_date = datetime(1800, 1, 1)
+    end_date = datetime(2100, 12, 31)
+
+    # 优化算法：
+    # 1. 先找到第一个日柱匹配的公历日期作为起点
+    first_match_date = None
+    search_date = start_date
+    while search_date <= end_date:
+        try:
+            # 使用中午12点来确定当天的日柱，避免跨日子时(23点)的边界问题
+            solar_day_check = Solar.fromYmdHms(search_date.year, search_date.month, search_date.day, 12, 0, 0)
+            day_gz = solar_day_check.getLunar().getEightChar().getDay()
+            if day_gz == day_pillar:
+                first_match_date = search_date
+                break
+        except Exception:
+            pass  # 忽略无效日期
+        search_date += timedelta(days=1)
+
+    if first_match_date is None:
+        print("\n在 1800-2100 年间未找到任何匹配日柱的日期。")
+        return None
+
+    # 2. 从第一个匹配日开始，以60天为步长进行“跳跃”搜索
+    current_date = first_match_date
+    while current_date <= end_date:
+        try:
+            # 在这个日柱正确的日期，精确检查所有四柱
+            solar = Solar.fromYmdHms(current_date.year, current_date.month, current_date.day, target_hour, 0, 0)
+            ec = solar.getLunar().getEightChar()
+            
+            calc_year = ec.getYear()
+            calc_month = ec.getMonth()
+            calc_day = ec.getDay()
+            calc_hour = ec.getTime()
+            
+            # 进行全匹配校验
+            if (calc_year == year_pillar and
+                calc_month == month_pillar and
+                calc_day == day_pillar and
+                calc_hour == hour_pillar):
+                found_dates.append(solar)
+                
+        except Exception:
+            pass # 忽略计算错误
+        
+        # 直接跳到60天后，那天的日柱必然相同
+        current_date += timedelta(days=60)
+        
+    if not found_dates:
+        print("\n在 1800-2100 年间未找到与该八字匹配的日期。")
+        return None
+        
+    print("\n" + "=" * 50)
+    print("        找到以下匹配的时间点")
+    print("=" * 50)
+    for i, solar_obj in enumerate(found_dates):
+        lunar_obj = solar_obj.getLunar()
+        solar_str = solar_obj.toYmdHms()
+        lunar_str = bazi_common.format_lunar_dt_from_object(lunar_obj, solar_obj.getHour())
+        print(f"[{i+1}] 公历: {solar_str} | 农历: {lunar_str}")
+    print("=" * 50)
+
+    # 让用户选择
+    while True:
+        try:
+            choice_idx = read_int(f"请选择一个时间点进行后续分析 (1-{len(found_dates)}): ", 1, len(found_dates))
+            selected_solar = found_dates[choice_idx - 1]
+            
+            # 获取性别信息
+            gender = get_gender_input()
+            
+            birth_dt = datetime(
+                selected_solar.getYear(),
+                selected_solar.getMonth(),
+                selected_solar.getDay(),
+                selected_solar.getHour()
+            )
+            return birth_dt, gender
+
+        except (ValueError, IndexError):
+            print("❌ 无效输入，请输入列表中的数字编号。")
+
+
 def main() -> None:
     """主函数"""
     bazi_common.ensure_dependencies([
@@ -467,33 +598,52 @@ def main() -> None:
     try:
         display_banner()
 
-        # 获取性别信息
-        gender = get_gender_input()
+        birth_datetime = None
+        gender = None
+        year_pillar, month_pillar, day_pillar, hour_pillar = "", "", "", ""
+        solar_time, lunar_time = "", ""
 
-        mode = read_choice("\n请选择输入历法（g=公历, n=农历）：", ["g", "n"])
+        mode = read_choice("\n请选择输入方式（g=公历, n=农历, b=八字反查）：", ["g", "n", "b"])
 
-        if mode == "g":
-            year, month, day, hour = get_solar_input()
-            try:
-                year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
-                solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
-                birth_datetime = datetime(year, month, day, hour)
-            except ValueError as e:
-                print(f"\n❌ 错误：{e}")
-                sys.exit(1)
+        if mode == 'b':
+            result = get_bazi_input_and_find_dates()
+            if result is None:
+                sys.exit(0) # 未找到或用户退出
+            
+            birth_datetime, gender = result
+            
+            # 从反查得到的日期时间直接获取所有信息
+            year, month, day, hour = birth_datetime.year, birth_datetime.month, birth_datetime.day, birth_datetime.hour
+            year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
+            solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
         else:
-            year, month, day, hour = get_lunar_input()
-            try:
-                year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar_auto(year, month, day, hour)
-                solar_time, lunar_time = get_date_info_from_lunar(year, month, day, hour)
-                # 从农历转为公历获取datetime对象
-                from lunar_python import Lunar
-                lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
-                solar = lunar.getSolar()
-                birth_datetime = datetime(solar.getYear(), solar.getMonth(), solar.getDay(), hour)
-            except ValueError as e:
-                print(f"\n❌ 错误：{e}")
-                sys.exit(1)
+            # 原有的公历/农历输入逻辑
+            gender = get_gender_input()
+            if mode == "g":
+                year, month, day, hour = get_solar_input()
+                try:
+                    year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
+                    solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
+                    birth_datetime = datetime(year, month, day, hour)
+                except ValueError as e:
+                    print(f"\n❌ 错误：{e}")
+                    sys.exit(1)
+            else: # mode == "n"
+                year, month, day, hour = get_lunar_input()
+                try:
+                    year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar_auto(year, month, day, hour)
+                    solar_time, lunar_time = get_date_info_from_lunar(year, month, day, hour)
+                    # 从农历转为公历获取datetime对象
+                    lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
+                    solar = lunar.getSolar()
+                    birth_datetime = datetime(solar.getYear(), solar.getMonth(), solar.getDay(), hour)
+                except ValueError as e:
+                    print(f"\n❌ 错误：{e}")
+                    sys.exit(1)
+        
+        if birth_datetime is None or gender is None:
+            print("\n❌ 未能获取到有效的出生日期或性别，程序终止。")
+            sys.exit(1)
 
         # 计算大运信息
         try:
