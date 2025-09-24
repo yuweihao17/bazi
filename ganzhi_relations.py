@@ -81,7 +81,7 @@ def _find_relations(items: List[str], relation_map: dict, size: int) -> List[str
 def analyze_ganzhi_relations(*pillars: str) -> str:
     """
     分析多个干支之间的作用关系
-    遵循特定顺序：合 -> 克，三会 -> 三合 -> 六合 -> ...
+    遵循特定顺序：合 -> 克，六合 -> 三合 -> 土局 -> 三会 -> ...
     """
     if not pillars:
         return "天干：无\n地支：无"
@@ -89,36 +89,32 @@ def analyze_ganzhi_relations(*pillars: str) -> str:
     gans = [p[0] for p in pillars]
     zhis = [p[1] for p in pillars]
     
-    # 1. 天干分析
+    # 1. 天干分析 (修正：移除used_gans，允许一个天干参与多种关系)
     tiangan_results = []
-    used_gans: Set[str] = set()
     
     # 天干合
     if len(gans) >= 2:
-        for g1, g2 in combinations(gans, 2):
+        # 使用list(set(gans))避免因重复天干导致重复查找
+        for g1, g2 in combinations(list(set(gans)), 2):
             key = frozenset([g1, g2])
             if key in TIANGAN_HE:
-                if g1 not in used_gans and g2 not in used_gans:
-                    tiangan_results.append(TIANGAN_HE[key])
-                    used_gans.add(g1)
-                    used_gans.add(g2)
+                tiangan_results.append(TIANGAN_HE[key])
     
     # 天干克
-    remaining_gans = [g for g in gans if g not in used_gans]
-    if len(remaining_gans) >= 2:
-        for g1, g2 in combinations(remaining_gans, 2):
+    if len(gans) >= 2:
+        # 遍历所有排列以检查克制关系
+        for g1, g2 in combinations(gans, 2):
             if (g1, g2) in TIANGAN_KE:
                 tiangan_results.append(TIANGAN_KE[(g1, g2)])
             elif (g2, g1) in TIANGAN_KE:
                 tiangan_results.append(TIANGAN_KE[(g2, g1)])
 
-    # 2. 地支分析
+    # 2. 地支分析 (修正：调整检查顺序)
     dizhi_results = []
     unique_zhis = list(set(zhis))
     
-    # 三会
-    san_hui = _find_relations(unique_zhis, DIZHI_SANHUI, 3)
-    dizhi_results.extend(san_hui)
+    # 六合
+    dizhi_results.extend(_find_relations(unique_zhis, DIZHI_LIUHE, 2))
     
     # 三合
     san_he = _find_relations(unique_zhis, DIZHI_SANHE, 3)
@@ -128,10 +124,11 @@ def analyze_ganzhi_relations(*pillars: str) -> str:
     he_tu_ju = _find_relations(unique_zhis, DIZHI_HETUJU, 4)
     dizhi_results.extend(he_tu_ju)
     
-    # 六合
-    dizhi_results.extend(_find_relations(unique_zhis, DIZHI_LIUHE, 2))
+    # 三会
+    san_hui = _find_relations(unique_zhis, DIZHI_SANHUI, 3)
+    dizhi_results.extend(san_hui)
     
-    # 半合 (排除已成三合局的情况)
+    # 半合 (如果完整的三合局不存在)
     is_san_he_present = bool(san_he)
     if not is_san_he_present:
         dizhi_results.extend(_find_relations(unique_zhis, DIZHI_BANHE, 2))
@@ -142,8 +139,9 @@ def analyze_ganzhi_relations(*pillars: str) -> str:
     # 拱合
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_GONGHE, 2))
     
-    # 刑
+    # 刑 (三刑)
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_XING, 3))
+    # 刑 (二刑)
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_XING, 2))
     
     # 自刑
@@ -151,17 +149,21 @@ def analyze_ganzhi_relations(*pillars: str) -> str:
         if zhis.count(zhi) >= 2:
             dizhi_results.append(DIZHI_ZIXING[zhi])
             
-    # 冲
+    # 六冲
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_LIUCHONG, 2))
     
-    # 破
+    # 六破
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_LIUPO, 2))
     
-    # 害
+    # 六害
     dizhi_results.extend(_find_relations(unique_zhis, DIZHI_LIUHAI, 2))
     
     # 3. 格式化输出
-    tiangan_str = f"天干：{', '.join(tiangan_results) or '无作用关系'}"
-    dizhi_str = f"地支：{', '.join(dizhi_results) or '无作用关系'}"
+    # 去重并保持顺序
+    unique_tiangan_results = list(dict.fromkeys(tiangan_results))
+    unique_dizhi_results = list(dict.fromkeys(dizhi_results))
+    
+    tiangan_str = f"天干：{', '.join(unique_tiangan_results) or '无作用关系'}"
+    dizhi_str = f"地支：{', '.join(unique_dizhi_results) or '无作用关系'}"
     
     return f"{tiangan_str}\n{dizhi_str}"

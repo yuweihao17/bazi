@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 import bazi_common
 import shishen
 import changsheng
-import ai_analyzer
+from ai_analyzer import AIAnalyzer
 from lunar_python import Solar, Lunar
 
 # --- 全局常量 ---
@@ -93,9 +93,9 @@ def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int,
     """
     显示大运排盘、流年列表，并附上原局与大运(五柱)的作用关系分析
     """
-    print("\n" + "=" * 50)
-    print(f"        {dayun_ganzhi}大运排盘及流年详情")
-    print("=" * 50)
+    print("\n" + "=" * 60)
+    print(bazi_common.pad_str_to_center(f"{dayun_ganzhi}大运排盘及流年详情", 60))
+    print("=" * 60)
     print()
 
     # 显示五柱排盘
@@ -112,33 +112,25 @@ def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int,
 
     # 显示流年表格
     print("【十年流年】")
-    liunian_ganzhi_str = "".join([bazi_common.pad_str_to_center(g, 6) for g, _, _ in liunian_list])
+    # 动态调整宽度以适应6个字符的干支
+    liunian_col_width = 8
+    liunian_ganzhi_str = "".join([bazi_common.pad_str_to_center(g, liunian_col_width) for g, _, _ in liunian_list])
     print(f"流年：{liunian_ganzhi_str}")
     
-    years_str = "".join([bazi_common.pad_str_to_center(y, 6) for _, y, _ in liunian_list])
+    years_str = "".join([bazi_common.pad_str_to_center(str(y), liunian_col_width) for _, y, _ in liunian_list])
     print(f"年份：{years_str}")
     
-    ages_str = "".join([bazi_common.pad_str_to_center(a, 6) for _, _, a in liunian_list])
+    ages_str = "".join([bazi_common.pad_str_to_center(str(a), liunian_col_width) for _, _, a in liunian_list])
     print(f"岁数：{ages_str}")
     
-    print("-" * 50)
+    table_width = len("年份：") * 2 + len(years_str) # 近似计算宽度
+    print("-" * table_width)
 
     # 分析并显示五柱（原局+大运）关系
     print("\n【原局与大运作用关系】")
     relations = analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, dayun_ganzhi)
     print(relations)
-    print("-" * 50)
-
-    # AI 解读大运
-    ai_analyzer.get_ai_interpretation("dayun_yingxiang", {
-        "gender": gender,
-        "year_pillar": year_pillar,
-        "month_pillar": month_pillar,
-        "day_pillar": day_pillar,
-        "hour_pillar": hour_pillar,
-        "dayun_pillar": dayun_ganzhi,
-        "relations": relations
-    })
+    print("-" * table_width)
 
 
 def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> None:
@@ -219,11 +211,12 @@ def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> No
     print("-" * total_width)
 
 
-def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,
+def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,
                        year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str, gender: str) -> None:
     """流年查询的交互式循环"""
     print("\n" + "-" * 50)
-    print("流年查询功能：")
+    print("大运和流年分析选项：")
+    print("你可以选择一个大运进行整体分析，或者在选定大运后，进一步分析其中的具体流年。")
     print(f"可查询的大运：{' '.join(dayun_list)}")
     print("输入 'q' 或 'quit' 退出")
     print("-" * 50)
@@ -247,7 +240,31 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                     actual_start_age = rounded_start_age + dayun_index * 10
                     current_liunian_list = get_liunian_for_dayun(current_dayun, start_year, actual_start_age)
                     
+                    # 首先显示所有信息
                     display_liunian_result(current_dayun, current_liunian_list, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
+
+                    # 然后进行AI解读
+                    analyzer.get_interpretation(
+                        analysis_type="dayun_yingxiang", 
+                        data={
+                            "gender": gender,
+                            "year_pillar": year_pillar,
+                            "month_pillar": month_pillar,
+                            "day_pillar": day_pillar,
+                            "hour_pillar": hour_pillar,
+                            "dayun_pillar": current_dayun,
+                            "dayun_start_age": actual_start_age,
+                            "dayun_end_age": actual_start_age + 9,
+                            "start_year": start_year,
+                            "end_year": start_year + 9,
+                            "dayun_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun),
+                            
+                            # 依赖项所需的数据
+                            "day_master": day_pillar[0],
+                            "yuanju_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar)
+                        },
+                        dependencies=["bazi_yuanju"]
+                    )
                 else:
                     print(f"❌ 请输入有效的大运干支：{' '.join(dayun_list)}")
                     continue
@@ -273,8 +290,18 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                     continue
                     
                 if liunian_input in liunian_ganzhi_options:
+                    # 查找选定流年的详细信息
+                    selected_liunian_info = next((item for item in current_liunian_list if item[0] == liunian_input), None)
+                    if not selected_liunian_info:
+                        print("❌ 内部错误：无法找到流年信息。")
+                        continue
+                    
+                    liunian_ganzhi, liunian_year, liunian_age = selected_liunian_info
+                    dayun_index = dayun_list.index(current_dayun)
+                    dayun_start_age = rounded_start_age + dayun_index * 10
+
                     title = f"六柱（原局+大运+流年）作用关系分析"
-                    subtitle = f"大运[{current_dayun}] - 流年[{liunian_input}]"
+                    subtitle = f"大运[{current_dayun}] - 流年[{liunian_ganzhi}]"
                     total_width = (CHART_COL_WIDTH * 6) + 6 # 6柱 + 左侧标签宽度
                     
                     print("\n" + "=" * total_width)
@@ -284,7 +311,7 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                     
                     # 显示包含流年和大运的六柱排盘
                     pillars_for_chart = [
-                        {'name': '流年', 'ganzhi': liunian_input},
+                        {'name': '流年', 'ganzhi': liunian_ganzhi},
                         {'name': '大运', 'ganzhi': current_dayun},
                         {'name': '年柱', 'ganzhi': year_pillar},
                         {'name': '月柱', 'ganzhi': month_pillar},
@@ -296,21 +323,41 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                     print()
 
                     # 分析六柱关系
-                    relations = analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun, liunian_input)
+                    relations = analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun, liunian_ganzhi)
                     print(relations)
                     print("=" * total_width)
 
                     # AI 解读流年
-                    ai_analyzer.get_ai_interpretation("liunian_fenxi", {
-                        "gender": gender,
-                        "year_pillar": year_pillar,
-                        "month_pillar": month_pillar,
-                        "day_pillar": day_pillar,
-                        "hour_pillar": hour_pillar,
-                        "dayun_pillar": current_dayun,
-                        "liunian_pillar": liunian_input,
-                        "relations": relations
-                    })
+                    analyzer.get_interpretation(
+                        analysis_type="liunian_fenxi",
+                        data={
+                            # 通用数据
+                            "gender": gender,
+                            "year_pillar": year_pillar,
+                            "month_pillar": month_pillar,
+                            "day_pillar": day_pillar,
+                            "hour_pillar": hour_pillar,
+                            "day_master": day_master,
+
+                            # 原局依赖数据
+                            "yuanju_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar),
+
+                            # 大运依赖数据
+                            "dayun_pillar": current_dayun,
+                            "dayun_start_age": dayun_start_age,
+                            "dayun_end_age": dayun_start_age + 9,
+                            "start_year": dayun_years[dayun_index],
+                            "end_year": dayun_years[dayun_index] + 9,
+                            "dayun_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun),
+
+                            # 当前流年分析所需数据
+                            "liunian_pillar": liunian_ganzhi,
+                            "liunian_year": liunian_year,
+                            "liunian_age": liunian_age,
+                            "liunian_relations": relations
+                        },
+                        dependencies=["bazi_yuanju", "dayun_yingxiang"]
+                    )
                 else:
                     print("❌ 无效的流年输入。")
             
@@ -333,7 +380,7 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
             break
 
 
-def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
+def display_dayun_result(analyzer: AIAnalyzer, year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
                         solar_time: str, lunar_time: str, gender: str, 
                         start_age: int, start_months: int, start_days: int, start_hours: int,
                         dayun_list: List[str], dayun_years: List[int], rounded_start_age: int) -> None:
@@ -366,14 +413,14 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
     print("-" * total_width)
 
     # AI 解读原局
-    ai_analyzer.get_ai_interpretation("bazi_yuanju", {
+    analyzer.get_interpretation("bazi_yuanju", {
         "gender": gender,
         "year_pillar": year_pillar,
         "month_pillar": month_pillar,
         "day_pillar": day_pillar,
         "day_master": day_master,
         "hour_pillar": hour_pillar,
-        "relations": relations
+        "yuanju_relations": relations
     })
     
     print(bazi_common.pad_str(f"起大运时间：{start_age}岁{start_months}个月{start_days}天{start_hours}个时辰", total_width))
@@ -398,6 +445,27 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
     print(f"年份：{years_str}")
     
     print("=" * total_width)
+
+    # AI 解读人生大运趋势
+    day_master = day_pillar[0]
+    dayun_list_str = "\n".join([f"- {age}岁起: {ganzhi} ({year}年开始)" 
+                                for ganzhi, age, year in zip(headers, ages, years)])
+
+    analyzer.get_interpretation(
+        analysis_type="bazi_dayun_trend", 
+        data={
+            "gender": gender,
+            "year_pillar": year_pillar,
+            "month_pillar": month_pillar,
+            "day_pillar": day_pillar,
+            "day_master": day_master,
+            "hour_pillar": hour_pillar,
+            "dayun_list_str": dayun_list_str,
+            # 为依赖项添加数据
+            "yuanju_relations": relations
+        },
+        dependencies=["bazi_yuanju"]
+    )
 
 
 def calc_bazi_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[str, str, str, str]:
@@ -640,110 +708,124 @@ def main() -> None:
     """
     bazi_common.ensure_dependencies([
         ("lunar_python", "pip install lunar-python>=1.2.13"),
-        ("wcwidth", "pip install wcwidth")
+        ("wcwidth", "pip install wcwidth"),
+        ("openai", "pip install openai")
     ])
     
     try:
+        analyzer = AIAnalyzer() # 创建 AI 分析器实例
         display_banner()
 
-        birth_datetime = None
-        gender = None
-        year_pillar, month_pillar, day_pillar, hour_pillar = "", "", "", ""
-        solar_time, lunar_time = "", ""
+        while True: # 主循环，允许重新开始
+            analyzer.reset_history() # 为每次新的排盘重置AI对话历史
 
-        mode = read_choice("\n请选择输入方式（g=公历, n=农历, b=八字反查）：", ["g", "n", "b"])
+            birth_datetime = None
+            gender = None
+            year_pillar, month_pillar, day_pillar, hour_pillar = "", "", "", ""
+            solar_time, lunar_time = "", ""
 
-        if mode == 'b':
-            result = get_bazi_input_and_find_dates()
-            if result is None:
-                sys.exit(0) # 未找到或用户退出
-            
-            birth_datetime, gender = result
-            
-            # 从反查得到的日期时间直接获取所有信息
-            year, month, day, hour = birth_datetime.year, birth_datetime.month, birth_datetime.day, birth_datetime.hour
-            year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
-            solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
-        else:
-            # 原有的公历/农历输入逻辑
-            gender = get_gender_input()
-            if mode == "g":
-                year, month, day, hour = get_solar_input()
-                try:
-                    year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
-                    solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
-                    birth_datetime = datetime(year, month, day, hour)
-                except ValueError as e:
-                    print(f"\n❌ 错误：{e}")
-                    sys.exit(1)
-            else: # mode == "n"
-                year, month, day, hour = get_lunar_input()
-                try:
-                    year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar_auto(year, month, day, hour)
-                    solar_time, lunar_time = get_date_info_from_lunar(year, month, day, hour)
-                    # 从农历转为公历获取datetime对象
-                    lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
-                    solar = lunar.getSolar()
-                    birth_datetime = datetime(solar.getYear(), solar.getMonth(), solar.getDay(), hour)
-                except ValueError as e:
-                    print(f"\n❌ 错误：{e}")
-                    sys.exit(1)
-        
-        if birth_datetime is None or gender is None:
-            print("\n❌ 未能获取到有效的出生日期或性别，程序终止。")
-            sys.exit(1)
+            mode = read_choice("\n请选择输入方式（g=公历, n=农历, b=八字反查）：", ["g", "n", "b"])
 
-        # 计算大运信息
-        try:
-            # 提取年柱天干
-            year_stem = year_pillar[0]
+            if mode == 'b':
+                result = get_bazi_input_and_find_dates()
+                if result is None:
+                    sys.exit(0) # 未找到或用户退出
+                
+                birth_datetime, gender = result
+                
+                # 从反查得到的日期时间直接获取所有信息
+                year, month, day, hour = birth_datetime.year, birth_datetime.month, birth_datetime.day, birth_datetime.hour
+                year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
+                solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
+            else:
+                # 原有的公历/农历输入逻辑
+                gender = get_gender_input()
+                if mode == "g":
+                    year, month, day, hour = get_solar_input()
+                    try:
+                        year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(year, month, day, hour)
+                        solar_time, lunar_time = get_date_info_from_solar(year, month, day, hour)
+                        birth_datetime = datetime(year, month, day, hour)
+                    except ValueError as e:
+                        print(f"\n❌ 错误：{e}")
+                        sys.exit(1)
+                else: # mode == "n"
+                    year, month, day, hour = get_lunar_input()
+                    try:
+                        year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar_auto(year, month, day, hour)
+                        solar_time, lunar_time = get_date_info_from_lunar(year, month, day, hour)
+                        # 从农历转为公历获取datetime对象
+                        lunar = Lunar.fromYmdHms(year, month, day, hour, 0, 0)
+                        solar = lunar.getSolar()
+                        birth_datetime = datetime(solar.getYear(), solar.getMonth(), solar.getDay(), hour)
+                    except ValueError as e:
+                        print(f"\n❌ 错误：{e}")
+                        sys.exit(1)
             
-            # 计算起运时间
-            start_age, start_months, start_days, start_hours, rounded_start_age = calculate_dayun_start_time(
-                birth_datetime, gender, year_stem
-            )
-            
-            # 获取大运排列
-            dayun_list = get_dayun_sequence(month_pillar, gender, year_stem)
-            
-            # 计算对应年份（传统算法：出生年为0岁）
-            dayun_years = calculate_dayun_years(birth_datetime.year, rounded_start_age)
-            
-            # 显示结果
-            display_dayun_result(
-                year_pillar, month_pillar, day_pillar, hour_pillar,
-                solar_time, lunar_time, gender,
-                start_age, start_months, start_days, start_hours,
-                dayun_list, dayun_years, rounded_start_age
-            )
-            
-            # 流年查询功能
-            liunian_query_loop(dayun_list, dayun_years, rounded_start_age, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
-            
-        except Exception as e:
-            print(f"\n❌ 大运计算错误：{e}")
-            # 即使大运计算失败，也显示基本八字信息
-            print("\n" + "=" * 40)
-            print("        四柱八字结果")
-            print("=" * 40)
-            print(f"公历时间：{solar_time}")
-            print(f"农历时间：{lunar_time}")
-            print(f"性别：{gender}")
-            print("-" * 40)
-            print(f"年柱：{year_pillar}")
-            print(f"月柱：{month_pillar}")
-            print(f"日柱：{day_pillar}")
-            print(f"时柱：{hour_pillar}")
-            print("-" * 40)
-            print(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}")
-            print("=" * 40)
+            if birth_datetime is None or gender is None:
+                print("\n❌ 未能获取到有效的出生日期或性别，程序终止。")
+                sys.exit(1)
+
+            # 计算大运信息
+            try:
+                # 提取年柱天干
+                year_stem = year_pillar[0]
+                
+                # 计算起运时间
+                start_age, start_months, start_days, start_hours, rounded_start_age = calculate_dayun_start_time(
+                    birth_datetime, gender, year_stem
+                )
+                
+                # 获取大运排列
+                dayun_list = get_dayun_sequence(month_pillar, gender, year_stem)
+                
+                # 计算对应年份（传统算法：出生年为0岁）
+                dayun_years = calculate_dayun_years(birth_datetime.year, rounded_start_age)
+                
+                # 显示结果
+                display_dayun_result(
+                    analyzer, year_pillar, month_pillar, day_pillar, hour_pillar,
+                    solar_time, lunar_time, gender,
+                    start_age, start_months, start_days, start_hours,
+                    dayun_list, dayun_years, rounded_start_age
+                )
+                
+                # 流年查询功能
+                liunian_query_loop(analyzer, dayun_list, dayun_years, rounded_start_age, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
+                
+                # 询问是否继续
+                if bazi_common.read_choice("\n是否要排一个新的八字？(y/n): ", ['y', 'n']).lower() != 'y':
+                    print("感谢使用，再见！")
+                    break # 退出主循环
+
+            except Exception as e:
+                print(f"\n❌ 大运计算错误：{e}")
+                # 即使大运计算失败，也显示基本八字信息
+                print("\n" + "=" * 40)
+                print("        四柱八字结果")
+                print("=" * 40)
+                print(f"公历时间：{solar_time}")
+                print(f"农历时间：{lunar_time}")
+                print(f"性别：{gender}")
+                print("-" * 40)
+                print(f"年柱：{year_pillar}")
+                print(f"月柱：{month_pillar}")
+                print(f"日柱：{day_pillar}")
+                print(f"时柱：{hour_pillar}")
+                print("-" * 40)
+                print(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}")
+                print("=" * 40)
         
     except KeyboardInterrupt:
         print("\n\n程序已退出")
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ 程序出现意外错误：{e}")
-        sys.exit(1)
+        # 询问是否重试
+        if bazi_common.read_choice("\n程序出现意外错误，是否要重新开始？(y/n): ", ['y', 'n']).lower() == 'y':
+            main() # 递归调用 main，不推荐，但对于简单脚本可行
+        else:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
