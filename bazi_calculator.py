@@ -164,6 +164,7 @@ def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> No
             'main_star': main_star,
             'gan': gan,
             'zhi': zhi,
+            'nayin': bazi_common.NAYIN_MAP.get(p['ganzhi'], ''), # 获取纳音
             'hidden': hidden_stems_with_shishen,
             'xing_yun': changsheng.get_changsheng_state(day_master, zhi), # 星运
             'zi_zuo': changsheng.get_changsheng_state(gan, zhi) # 自坐
@@ -207,6 +208,7 @@ def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> No
     # 增加星运和自坐
     print_row('xing_yun', '星运')
     print_row('zi_zuo', '自坐')
+    print_row('nayin', '纳音')
     
     print("-" * total_width)
 
