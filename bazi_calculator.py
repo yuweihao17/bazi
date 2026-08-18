@@ -19,7 +19,6 @@ import sys
 from typing import Tuple, Optional, List, Any
 from datetime import datetime, timedelta
 import bazi_common
-from ai_analyzer import AIAnalyzer
 from lunar_python import Solar, Lunar
 
 # --- 全局常量 ---
@@ -136,7 +135,7 @@ def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> No
     bazi_common.display_bazi_chart(pillars, day_master, gender)
 
 
-def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,
+def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,
                        year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str, gender: str) -> None:
     """流年查询的交互式循环"""
     print("\n" + "-" * 50)
@@ -168,28 +167,6 @@ def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years:
                     # 首先显示所有信息
                     display_liunian_result(current_dayun, current_liunian_list, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
 
-                    # 然后进行AI解读
-                    analyzer.get_interpretation(
-                        analysis_type="dayun_yingxiang", 
-                        data={
-                            "gender": gender,
-                            "year_pillar": year_pillar,
-                            "month_pillar": month_pillar,
-                            "day_pillar": day_pillar,
-                            "hour_pillar": hour_pillar,
-                            "dayun_pillar": current_dayun,
-                            "dayun_start_age": actual_start_age,
-                            "dayun_end_age": actual_start_age + 9,
-                            "start_year": start_year,
-                            "end_year": start_year + 9,
-                            "dayun_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun),
-                            
-                            # 依赖项所需的数据
-                            "day_master": day_pillar[0],
-                            "yuanju_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar)
-                        },
-                        dependencies=["bazi_yuanju"]
-                    )
                 else:
                     print(f"❌ 请输入有效的大运干支：{' '.join(dayun_list)}")
                     continue
@@ -252,37 +229,6 @@ def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years:
                     print(relations)
                     print("=" * total_width)
 
-                    # AI 解读流年
-                    analyzer.get_interpretation(
-                        analysis_type="liunian_fenxi",
-                        data={
-                            # 通用数据
-                            "gender": gender,
-                            "year_pillar": year_pillar,
-                            "month_pillar": month_pillar,
-                            "day_pillar": day_pillar,
-                            "hour_pillar": hour_pillar,
-                            "day_master": day_master,
-
-                            # 原局依赖数据
-                            "yuanju_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar),
-
-                            # 大运依赖数据
-                            "dayun_pillar": current_dayun,
-                            "dayun_start_age": dayun_start_age,
-                            "dayun_end_age": dayun_start_age + 9,
-                            "start_year": dayun_years[dayun_index],
-                            "end_year": dayun_years[dayun_index] + 9,
-                            "dayun_relations": analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, current_dayun),
-
-                            # 当前流年分析所需数据
-                            "liunian_pillar": liunian_ganzhi,
-                            "liunian_year": liunian_year,
-                            "liunian_age": liunian_age,
-                            "liunian_relations": relations
-                        },
-                        dependencies=["bazi_yuanju", "dayun_yingxiang"]
-                    )
                 else:
                     print("❌ 无效的流年输入。")
             
@@ -305,7 +251,7 @@ def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years:
             break
 
 
-def display_dayun_result(analyzer: AIAnalyzer, year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
+def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
                         solar_time: str, lunar_time: str, gender: str, 
                         start_age: int, start_months: int, start_days: int, start_hours: int,
                         dayun_list: List[str], dayun_years: List[int], rounded_start_age: int) -> None:
@@ -337,17 +283,6 @@ def display_dayun_result(analyzer: AIAnalyzer, year_pillar: str, month_pillar: s
     print(relations)
     print("-" * total_width)
 
-    # AI 解读原局
-    analyzer.get_interpretation("bazi_yuanju", {
-        "gender": gender,
-        "year_pillar": year_pillar,
-        "month_pillar": month_pillar,
-        "day_pillar": day_pillar,
-        "day_master": day_master,
-        "hour_pillar": hour_pillar,
-        "yuanju_relations": relations
-    })
-    
     print(bazi_common.pad_str(f"起大运时间：{start_age}岁{start_months}个月{start_days}天{start_hours}个时辰", total_width))
     print(bazi_common.pad_str(f"实际起运年份：{dayun_years[0]} 年，实际起运年龄：{rounded_start_age} 岁", total_width))
     print("-" * total_width)
@@ -370,28 +305,6 @@ def display_dayun_result(analyzer: AIAnalyzer, year_pillar: str, month_pillar: s
     print(f"年份：{years_str}")
     
     print("=" * total_width)
-
-    # AI 解读人生大运趋势
-    day_master = day_pillar[0]
-    dayun_list_str = "\n".join([f"- {age}岁起: {ganzhi} ({year}年开始)" 
-                                for ganzhi, age, year in zip(headers, ages, years)])
-
-    analyzer.get_interpretation(
-        analysis_type="bazi_dayun_trend", 
-        data={
-            "gender": gender,
-            "year_pillar": year_pillar,
-            "month_pillar": month_pillar,
-            "day_pillar": day_pillar,
-            "day_master": day_master,
-            "hour_pillar": hour_pillar,
-            "dayun_list_str": dayun_list_str,
-            # 为依赖项添加数据
-            "yuanju_relations": relations
-        },
-        dependencies=["bazi_yuanju"]
-    )
-
 
 def calc_bazi_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[str, str, str, str]:
     """
@@ -629,7 +542,7 @@ def main() -> None:
     1. 检查依赖。
     2. 显示欢迎横幅。
     3. 根据用户选择的模式（公历、农历、八字反查）获取八字信息。
-    4. 计算并显示详细的排盘、大运、流年及 AI 解读。
+    4. 计算并显示详细的排盘、大运和流年。
     """
     bazi_common.ensure_dependencies([
         ("lunar_python", "pip install lunar-python>=1.2.13"),
@@ -637,12 +550,9 @@ def main() -> None:
     ])
     
     try:
-        analyzer = AIAnalyzer() # 创建 AI 分析器实例
         display_banner()
 
         while True: # 主循环，允许重新开始
-            analyzer.reset_history() # 为每次新的排盘重置AI对话历史
-
             birth_datetime = None
             gender = None
             year_pillar, month_pillar, day_pillar, hour_pillar = "", "", "", ""
@@ -708,14 +618,14 @@ def main() -> None:
                 
                 # 显示结果
                 display_dayun_result(
-                    analyzer, year_pillar, month_pillar, day_pillar, hour_pillar,
+                    year_pillar, month_pillar, day_pillar, hour_pillar,
                     solar_time, lunar_time, gender,
                     start_age, start_months, start_days, start_hours,
                     dayun_list, dayun_years, rounded_start_age
                 )
                 
                 # 流年查询功能
-                liunian_query_loop(analyzer, dayun_list, dayun_years, rounded_start_age, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
+                liunian_query_loop(dayun_list, dayun_years, rounded_start_age, year_pillar, month_pillar, day_pillar, hour_pillar, gender)
                 
                 # 询问是否继续
                 if bazi_common.read_choice("\n是否要排一个新的八字？(y/n): ", ['y', 'n']).lower() != 'y':

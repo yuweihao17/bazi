@@ -440,10 +440,20 @@ def display_bazi_chart(pillars: List[Dict[str, str]], day_master: str, gender: s
     from shishen import HIDDEN_STEMS, get_shishen
 
     col_width = 12
-    label_col_width = 6
+    label_col_width = max(6, get_str_display_width("月令能量"))
     gender_char = "男" if gender == "男" else "女"
     chart_data: List[Dict[str, Any]] = []
     max_hidden_stems = 0
+    month_branch = ""
+
+    for pillar in pillars:
+        if pillar.get("name") == "月柱":
+            month_ganzhi = pillar.get("ganzhi", "")
+            if len(month_ganzhi) >= 2:
+                month_branch = month_ganzhi[1]
+            break
+    if not month_branch:
+        raise ValueError("详细排盘必须包含原局月柱，才能计算月令能量")
 
     for pillar in pillars:
         ganzhi = pillar.get("ganzhi", "")
@@ -460,6 +470,7 @@ def display_bazi_chart(pillars: List[Dict[str, str]], day_master: str, gender: s
             "hidden": hidden,
             "xing_yun": get_changsheng_state(day_master, zhi),
             "zi_zuo": get_changsheng_state(gan, zhi),
+            "month_energy": get_changsheng_state(gan, month_branch),
             "nayin": NAYIN_MAP.get(ganzhi, ""),
         })
 
@@ -487,6 +498,7 @@ def display_bazi_chart(pillars: List[Dict[str, str]], day_master: str, gender: s
 
     print_row("xing_yun", "星运")
     print_row("zi_zuo", "自坐")
+    print_row("month_energy", "月令能量")
     print_row("nayin", "纳音")
     print("-" * total_width)
 
