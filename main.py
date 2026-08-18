@@ -183,7 +183,7 @@ def calc_bazi_from_solar(year: int, month: int, day: int, hour: int) -> Tuple[st
         raise ValueError(f"公历日期无效: {year}-{month:02d}-{day:02d} {hour:02d}:00") from e
 
 
-def calc_bazi_from_lunar(year: int, month: int, day: int, hour: int, is_leap: bool) -> Tuple[str, str, str, str]:
+def calc_bazi_from_lunar(year: int, month: int, day: int, hour: int, is_leap: bool = False) -> Tuple[str, str, str, str]:
     """
     从农历日期计算四柱八字
     
@@ -430,14 +430,6 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
         pass
     print(relations)
     
-    # AI 解读原局
-    print("\n【AI智能解读】")
-    ai_analyzer.get_ai_interpretation("bazi_yuanju", {
-        "gender": gender, "year_pillar": year_pillar, "month_pillar": month_pillar,
-        "day_pillar": day_pillar, "day_master": day_pillar[0], "hour_pillar": hour_pillar,
-        "relations": relations
-    })
-
     print("-" * total_width)
     print(bazi_common.pad_str(f"起大运时间：{start_age}岁{start_months}个月{start_days}天{start_hours}个时辰", total_width))
     print(bazi_common.pad_str(f"实际起运年份：{dayun_years[0]} 年，实际起运年龄：{rounded_start_age} 岁", total_width))
@@ -479,12 +471,19 @@ def main() -> None:
 
         mode = read_choice("\n请选择输入历法（g=公历, n=农历）：", ["g", "n"])
 
+        year_pillar = month_pillar = day_pillar = hour_pillar = ""
+        birth_datetime: Optional[datetime] = None
+
         # Get date input
         if mode == "g":
             year, month, day, hour = get_solar_input()
             solar_time = f"{year}年{month}月{day}日 {hour:02d}:00"
             
             from lunar_python import Solar  # type: ignore
+            year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_solar(
+                year, month, day, hour
+            )
+            birth_datetime = datetime(year, month, day, hour)
             lunar = Solar.fromYmdHms(year, month, day, hour, 0, 0).getLunar()
             lunar_time = bazi_common.format_lunar_dt_from_object(lunar, hour)
 
@@ -497,7 +496,9 @@ def main() -> None:
                 solar = lunar.getSolar()
                 solar_time = f"{solar.getYear()}年{solar.getMonth()}月{solar.getDay()}日 {hour:02d}:00"
                 lunar_time = bazi_common.format_lunar_dt_from_object(lunar, hour)
-                year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar(year, month, day, hour)
+                year_pillar, month_pillar, day_pillar, hour_pillar = calc_bazi_from_lunar(
+                    year, month, day, hour
+                )
                 birth_datetime = datetime(solar.getYear(), solar.getMonth(), solar.getDay(), hour)
             except ValueError as e:
                 print(f"\n❌ 错误：{e}")

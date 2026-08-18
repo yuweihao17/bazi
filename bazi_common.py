@@ -3,6 +3,23 @@ import sys
 from typing import Tuple, List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import importlib.util
+
+
+def configure_console() -> None:
+    """Keep CLI diagnostics printable on Windows code pages and redirected output."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        try:
+            # Preserve the user's selected encoding, but never let a status marker
+            # turn an otherwise useful error message into a second exception.
+            reconfigure(errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
+configure_console()
 try:
     from wcwidth import wcswidth
 except ImportError:
@@ -299,6 +316,9 @@ def read_int(prompt: str, min_value: Optional[int] = None, max_value: Optional[i
             return v
         except ValueError:
             print("请输入有效的整数！")
+        except EOFError:
+            print("\n程序已退出")
+            sys.exit(0)
         except KeyboardInterrupt:
             print("\n程序已取消")
             sys.exit(0)
@@ -330,6 +350,9 @@ def read_choice(prompt: str, choices: List[str]) -> str:
             print(f"请输入 {', '.join(choices)} 之一！")
         except KeyboardInterrupt:
             print("\n程序已取消")
+            sys.exit(0)
+        except EOFError:
+            print("\n程序已退出")
             sys.exit(0)
 
 
