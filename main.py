@@ -10,7 +10,6 @@ from typing import Tuple, Optional, List
 from datetime import datetime, timedelta
 import bazi_common
 import importlib.util
-import ai_analyzer
 
 
 DEBUG = False

@@ -7,14 +7,14 @@ import importlib.util
 
 def configure_console() -> None:
     """Keep CLI diagnostics printable on Windows code pages and redirected output."""
-    for stream in (sys.stdout, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure is None:
             continue
         try:
-            # Preserve the user's selected encoding, but never let a status marker
-            # turn an otherwise useful error message into a second exception.
-            reconfigure(errors="replace")
+            # UTF-8 keeps Chinese output and status markers readable when the
+            # process is launched from PowerShell or its output is redirected.
+            reconfigure(encoding="utf-8", errors="replace")
         except (OSError, ValueError):
             pass
 
