@@ -263,6 +263,29 @@ def get_liunian_for_dayun(dayun_ganzhi: str, start_year: int, start_age: int) ->
     return liunian_list
 
 
+def get_liuyue_for_liunian(liunian_year: int, liunian_age: int) -> List[Tuple[str, str, int, int]]:
+    """Return the 12 solar-term months associated with a selected flow year.
+
+    A flow year starts with the 寅 month around 立春 and ends with the 丑 month
+    before the following 立春.  Sampling the middle of each solar-term month
+    lets lunar-python apply the actual solar-term boundaries when deriving the
+    month pillar.
+    """
+    from lunar_python import Solar
+
+    month_samples = [(liunian_year, month, 15) for month in range(2, 13)]
+    month_samples.append((liunian_year + 1, 1, 15))
+    month_labels = [f"{branch}月" for branch in ZHI[2:]] + ["子月", "丑月"]
+    liuyue_list: List[Tuple[str, str, int, int]] = []
+
+    for label, (year, month, day) in zip(month_labels, month_samples):
+        solar = Solar.fromYmdHms(year, month, day, 12, 0, 0)
+        month_pillar = solar.getLunar().getEightChar().getMonth()
+        liuyue_list.append((month_pillar, label, year, month))
+
+    return liuyue_list
+
+
 def ensure_dependencies(dependencies: List[Tuple[str, str]]) -> None:
     """
     检查指定的Python库是否已安装，如果未安装则打印安装提示并退出程序。

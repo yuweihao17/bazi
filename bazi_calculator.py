@@ -82,6 +82,11 @@ def get_liunian_for_dayun(dayun_ganzhi: str, start_year: int, start_age: int) ->
     return bazi_common.get_liunian_for_dayun(dayun_ganzhi, start_year, start_age)
 
 
+def get_liuyue_for_liunian(liunian_year: int, liunian_age: int) -> List[Tuple[str, str, int, int]]:
+    """委托公共模块获取指定流年的十二个流月。"""
+    return bazi_common.get_liuyue_for_liunian(liunian_year, liunian_age)
+
+
 def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int, int]],
                           year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str, gender: str) -> None:
     """
@@ -221,6 +226,19 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                     print(relations)
                     print("=" * total_width)
 
+                    liuyue_query_loop(
+                        get_liuyue_for_liunian(liunian_year, liunian_age),
+                        current_dayun,
+                        liunian_ganzhi,
+                        liunian_year,
+                        liunian_age,
+                        year_pillar,
+                        month_pillar,
+                        day_pillar,
+                        hour_pillar,
+                        gender,
+                    )
+
                 else:
                     print("❌ 无效的流年输入。")
             
@@ -241,6 +259,74 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
         except (KeyboardInterrupt, EOFError):
             print("\n查询已退出。")
             break
+
+
+def liuyue_query_loop(
+    liuyue_list: List[Tuple[str, str, int, int]],
+    dayun_ganzhi: str,
+    liunian_ganzhi: str,
+    liunian_year: int,
+    liunian_age: int,
+    year_pillar: str,
+    month_pillar: str,
+    day_pillar: str,
+    hour_pillar: str,
+    gender: str,
+) -> None:
+    """Select and display a flow month within a selected flow year."""
+    print("\n" + "-" * 50)
+    print(f"{liunian_year}年（{liunian_ganzhi}）流月查询")
+    print(f"可查询的流月：{' '.join(item[0] for item in liuyue_list)}")
+    print("输入 'q' 或 'quit' 返回流年选择")
+    print("-" * 50)
+
+    liuyue_by_pillar = {item[0]: item for item in liuyue_list}
+    while True:
+        try:
+            liuyue_input = input("请输入要查询的流月干支：").strip()
+            if liuyue_input.lower() in ["q", "quit", "退出"]:
+                return
+
+            selected = liuyue_by_pillar.get(liuyue_input)
+            if selected is None:
+                print(f"❌ 请输入有效的流月干支：{' '.join(liuyue_by_pillar)}")
+                continue
+
+            liuyue_ganzhi, month_label, solar_year, solar_month = selected
+            title = "七柱（原局+大运+流年+流月）作用关系分析"
+            subtitle = f"大运[{dayun_ganzhi}] - 流年[{liunian_ganzhi}] - 流月[{liuyue_ganzhi} {month_label}]"
+            total_width = (CHART_COL_WIDTH * 7) + 6
+            print("\n" + "=" * total_width)
+            print(bazi_common.pad_str_to_center(title, total_width))
+            print(bazi_common.pad_str_to_center(subtitle, total_width))
+            print("=" * total_width)
+
+            pillars_for_chart = [
+                {"name": "流月", "ganzhi": liuyue_ganzhi},
+                {"name": "流年", "ganzhi": liunian_ganzhi},
+                {"name": "大运", "ganzhi": dayun_ganzhi},
+                {"name": "年柱", "ganzhi": year_pillar},
+                {"name": "月柱", "ganzhi": month_pillar},
+                {"name": "日柱", "ganzhi": day_pillar},
+                {"name": "时柱", "ganzhi": hour_pillar},
+            ]
+            bazi_common.display_bazi_chart(pillars_for_chart, day_pillar[0], gender)
+            print(f"流月公历参考：{solar_year}年{solar_month}月，命主约{liunian_age}岁")
+            relations = analyze_ganzhi_relations(
+                year_pillar,
+                month_pillar,
+                day_pillar,
+                hour_pillar,
+                dayun_ganzhi,
+                liunian_ganzhi,
+                liuyue_ganzhi,
+            )
+            print("\n【七柱作用关系】")
+            print(relations)
+            print("=" * total_width)
+        except (KeyboardInterrupt, EOFError):
+            print("\n流月查询已退出。")
+            return
 
 
 def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, hour_pillar: str,
