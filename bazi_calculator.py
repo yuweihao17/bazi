@@ -19,8 +19,6 @@ import sys
 from typing import Tuple, Optional, List, Any
 from datetime import datetime, timedelta
 import bazi_common
-import shishen
-import changsheng
 from ai_analyzer import AIAnalyzer
 from lunar_python import Solar, Lunar
 
@@ -134,83 +132,8 @@ def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int,
 
 
 def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> None:
-    """
-    显示格式化的八字排盘，包含主星、天干、地支、藏干和十神
-    """
-    col_width = 12
-    label_col_width = 6  # 左侧标签列的宽度
-    gender_char = "男" if gender == "男" else "女"
-    
-    chart_data = []
-    max_hidden_stems = 0
-    
-    for p in pillars:
-        gan = p['ganzhi'][0]
-        zhi = p['ganzhi'][1]
-        
-        if p['name'] == '日柱':
-            main_star = f'元{gender_char}'
-        else:
-            main_star = shishen.get_shishen(gan, day_master)
-            
-        hidden_stems_list = shishen.HIDDEN_STEMS.get(zhi, [])
-        hidden_stems_with_shishen = [
-            f"{s} {shishen.get_shishen(s, day_master)}" for s in hidden_stems_list
-        ]
-        max_hidden_stems = max(max_hidden_stems, len(hidden_stems_with_shishen))
-        
-        chart_data.append({
-            'name': p['name'],
-            'main_star': main_star,
-            'gan': gan,
-            'zhi': zhi,
-            'nayin': bazi_common.NAYIN_MAP.get(p['ganzhi'], ''), # 获取纳音
-            'hidden': hidden_stems_with_shishen,
-            'xing_yun': changsheng.get_changsheng_state(day_master, zhi), # 星运
-            'zi_zuo': changsheng.get_changsheng_state(gan, zhi) # 自坐
-        })
-        
-    def print_row(data_key: str, label: str):
-        row_items = [bazi_common.pad_str_to_center(d[data_key], col_width) for d in chart_data]
-        
-        # 手动计算标签填充，以实现精确对齐
-        label_width = bazi_common.get_str_display_width(label)
-        padding = ' ' * max(0, label_col_width - label_width)
-        padded_label = label + padding
-        
-        print(f"{padded_label}{''.join(row_items)}")
-
-    total_width = label_col_width + col_width * len(chart_data)
-    print("-" * total_width)
-    
-    print_row('name', '') # 柱名
-    print_row('main_star', '主星')
-    print_row('gan', '天干')
-    print_row('zhi', '地支')
-    
-    print("-" * total_width)
-
-    for i in range(max_hidden_stems):
-        row_items = []
-        for d in chart_data:
-            item = d['hidden'][i] if i < len(d['hidden']) else ""
-            row_items.append(bazi_common.pad_str_to_center(item, col_width))
-        
-        label = "藏干" if i == 0 else ""
-        
-        # 手动计算标签填充
-        label_width = bazi_common.get_str_display_width(label)
-        padding = ' ' * max(0, label_col_width - label_width)
-        padded_label = label + padding
-        
-        print(f"{padded_label}{''.join(row_items)}")
-    
-    # 增加星运和自坐
-    print_row('xing_yun', '星运')
-    print_row('zi_zuo', '自坐')
-    print_row('nayin', '纳音')
-    
-    print("-" * total_width)
+    """Compatibility wrapper around the shared detailed chart renderer."""
+    bazi_common.display_bazi_chart(pillars, day_master, gender)
 
 
 def liunian_query_loop(analyzer: AIAnalyzer, dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,

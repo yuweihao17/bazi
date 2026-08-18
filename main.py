@@ -413,13 +413,14 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
     print(bazi_common.pad_str(f"农历时间：{lunar_time}", total_width))
     print(bazi_common.pad_str(f"性别：{gender}", total_width))
     
-    # 显示四柱八字
-    print("-" * total_width)
-    print(bazi_common.pad_str(f"年柱：{year_pillar}", total_width))
-    print(bazi_common.pad_str(f"月柱：{month_pillar}", total_width))
-    print(bazi_common.pad_str(f"日柱：{day_pillar}", total_width))
-    print(bazi_common.pad_str(f"时柱：{hour_pillar}", total_width))
-    print("-" * total_width)
+    # 显示完整四柱排盘：主星、十神、藏干、十二长生、自坐和纳音。
+    bazi_common.display_bazi_chart([
+        {"name": "年柱", "ganzhi": year_pillar},
+        {"name": "月柱", "ganzhi": month_pillar},
+        {"name": "日柱", "ganzhi": day_pillar},
+        {"name": "时柱", "ganzhi": hour_pillar},
+    ], day_pillar[0], gender)
+
     print(bazi_common.pad_str(f"四柱八字：{year_pillar} {month_pillar} {day_pillar} {hour_pillar}", total_width))
     
     # 添加原局干支关系分析

@@ -432,6 +432,65 @@ def display_banner() -> None:
     print("-" * 60)
 
 
+def display_bazi_chart(pillars: List[Dict[str, str]], day_master: str, gender: str) -> None:
+    """Display the detailed four/five/six-pillar chart shared by both CLIs."""
+    # Local imports keep the common input/calculation helpers lightweight and
+    # avoid coupling callers that only need calendar conversion.
+    from changsheng import get_changsheng_state
+    from shishen import HIDDEN_STEMS, get_shishen
+
+    col_width = 12
+    label_col_width = 6
+    gender_char = "男" if gender == "男" else "女"
+    chart_data: List[Dict[str, Any]] = []
+    max_hidden_stems = 0
+
+    for pillar in pillars:
+        ganzhi = pillar.get("ganzhi", "")
+        if len(ganzhi) < 2:
+            raise ValueError(f"无效的干支：{ganzhi!r}")
+        gan, zhi = ganzhi[0], ganzhi[1]
+        hidden = [f"{stem} {get_shishen(stem, day_master)}" for stem in HIDDEN_STEMS.get(zhi, [])]
+        max_hidden_stems = max(max_hidden_stems, len(hidden))
+        chart_data.append({
+            "name": pillar.get("name", ""),
+            "main_star": f"元{gender_char}" if pillar.get("name") == "日柱" else get_shishen(gan, day_master),
+            "gan": gan,
+            "zhi": zhi,
+            "hidden": hidden,
+            "xing_yun": get_changsheng_state(day_master, zhi),
+            "zi_zuo": get_changsheng_state(gan, zhi),
+            "nayin": NAYIN_MAP.get(ganzhi, ""),
+        })
+
+    def print_row(data_key: str, label: str) -> None:
+        row_items = [pad_str_to_center(item[data_key], col_width) for item in chart_data]
+        label_padding = " " * max(0, label_col_width - get_str_display_width(label))
+        print(f"{label}{label_padding}{''.join(row_items)}")
+
+    total_width = label_col_width + col_width * len(chart_data)
+    print("-" * total_width)
+    print_row("name", "")
+    print_row("main_star", "主星")
+    print_row("gan", "天干")
+    print_row("zhi", "地支")
+    print("-" * total_width)
+
+    for index in range(max_hidden_stems):
+        row_items = [
+            pad_str_to_center(item["hidden"][index] if index < len(item["hidden"]) else "", col_width)
+            for item in chart_data
+        ]
+        label = "藏干" if index == 0 else ""
+        label_padding = " " * max(0, label_col_width - get_str_display_width(label))
+        print(f"{label}{label_padding}{''.join(row_items)}")
+
+    print_row("xing_yun", "星运")
+    print_row("zi_zuo", "自坐")
+    print_row("nayin", "纳音")
+    print("-" * total_width)
+
+
 def get_str_display_width(s: str) -> int:
     """
     计算字符串在终端中的显示宽度，优先使用 `wcwidth` 库以兼容中文字符。
