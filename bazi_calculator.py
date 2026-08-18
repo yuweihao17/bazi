@@ -633,8 +633,7 @@ def main() -> None:
     """
     bazi_common.ensure_dependencies([
         ("lunar_python", "pip install lunar-python>=1.2.13"),
-        ("wcwidth", "pip install wcwidth"),
-        ("openai", "pip install openai")
+        ("wcwidth", "pip install wcwidth")
     ])
     
     try:

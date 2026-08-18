@@ -9,6 +9,7 @@ AI 八字解读模块
 """
 
 import sys
+import os
 from typing import List, Dict, Any, Optional, Set
 
 # 尝试导入 OpenAI，如果失败则设为 None
@@ -24,9 +25,8 @@ class AIAnalyzer:
     一个管理与AI模型的会话、生成八字解读的类。
     通过维护一个对话历史，实现连续、有上下文的分析。
     """
-    API_KEY: str = "sk-wcuxdzqlzbbcrgrpbcweehgcbofyhroupikdlbhlpzcikply"
-    BASE_URL: str = "https://api.siliconflow.cn/v1/"
-    MODEL_NAME: str = "deepseek-ai/DeepSeek-V3.1"
+    DEFAULT_BASE_URL: str = "https://api.siliconflow.cn/v1/"
+    DEFAULT_MODEL_NAME: str = "deepseek-ai/DeepSeek-V3.1"
 
     PROMPT_TEMPLATES: Dict[str, str] = {
         "bazi_yuanju": """
@@ -105,14 +105,35 @@ class AIAnalyzer:
         """
     }
 
-    def __init__(self):
-        if OpenAI is None:
-            raise ImportError("openai 库未安装，请执行 'pip install openai' 进行安装。")
-        self.API_KEY = self.API_KEY # 确保 API_KEY 被正确设置
-        self.BASE_URL = self.BASE_URL # 确保 BASE_URL 被正确设置
-        self.MODEL_NAME = self.MODEL_NAME # 确保 MODEL_NAME 被正确设置
-        self.PROMPT_TEMPLATES = self.PROMPT_TEMPLATES # 确保 PROMPT_TEMPLATES 被正确设置
-        self.client = OpenAI(base_url=self.BASE_URL, api_key=self.API_KEY)
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        base_url: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ):
+        """Create an analyzer using an OpenAI-compatible provider.
+
+        The key is deliberately read from the environment instead of being
+        stored in the repository.  ``BAZI_AI_API_KEY`` is preferred, with the
+        conventional ``SILICONFLOW_API_KEY`` and ``OPENAI_API_KEY`` accepted
+        for compatibility.
+        """
+        self.API_KEY = (
+            api_key
+            or os.getenv("BAZI_AI_API_KEY")
+            or os.getenv("SILICONFLOW_API_KEY")
+            or os.getenv("OPENAI_API_KEY")
+            or ""
+        ).strip()
+        self.BASE_URL = (
+            base_url or os.getenv("BAZI_AI_BASE_URL") or self.DEFAULT_BASE_URL
+        ).strip()
+        self.MODEL_NAME = (
+            model_name or os.getenv("BAZI_AI_MODEL") or self.DEFAULT_MODEL_NAME
+        ).strip()
+        self.client = None
+        if OpenAI is not None and self.API_KEY:
+            self.client = OpenAI(base_url=self.BASE_URL, api_key=self.API_KEY)
         self.history: List[Dict[str, str]] = []
         self.completed_analyses: Set[str] = set() # 状态跟踪器
 
@@ -129,8 +150,18 @@ class AIAnalyzer:
         self.history = []
         self.completed_analyses.clear()
 
+    def _report_unavailable(self) -> None:
+        if OpenAI is None:
+            print("AI 解读不可用：未安装 openai 库。")
+        else:
+            print("AI 解读不可用：请设置 BAZI_AI_API_KEY 环境变量。")
+
     def _interpret_stream(self, analysis_type: str, data: Dict[str, Any], is_dependency: bool = False) -> bool:
         """内部函数，执行API调用并处理流式输出。"""
+        if self.client is None:
+            self._report_unavailable()
+            return False
+
         prompt_template = self._get_prompt(analysis_type)
         if not prompt_template:
             print(f"❌ 错误：未找到分析类型 '{analysis_type}' 的模板。")
@@ -199,16 +230,24 @@ class AIAnalyzer:
             print(f"\n❌ AI 解读时发生错误：{e}", file=sys.stderr)
             return False
 
-    def get_interpretation(self, analysis_type: str, data: Dict[str, Any], dependencies: List[str] = []) -> None:
+    def get_interpretation(
+        self,
+        analysis_type: str,
+        data: Dict[str, Any],
+        dependencies: Optional[List[str]] = None,
+    ) -> None:
         """
         公开方法，处理用户交互和依赖分析。
         """
         do_ai_analysis = bazi_common.read_choice("\n是否需要 AI 智能解读？(y/n): ", ['y', 'n'])
         if do_ai_analysis.lower() != 'y':
             return
+        if self.client is None:
+            self._report_unavailable()
+            return
 
         # 检查并执行依赖分析
-        for dep in dependencies:
+        for dep in dependencies or []:
             if not self.has_analysis_been_done(dep):
                 print(f"\n---\n为了进行当前分析，需要先进行 [{dep.replace('bazi_', '').replace('_', ' ')}] 的基础分析。")
                 if not self._interpret_stream(dep, data, is_dependency=True):
