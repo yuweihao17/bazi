@@ -149,6 +149,9 @@ def query_liunian_interactive(dayun_list: List[str], dayun_years: List[int], act
         except KeyboardInterrupt:
             print("\n\n感谢使用！")
             break
+        except EOFError:
+            print("\n程序已退出")
+            break
         except Exception as e:
             print(f"查询过程中出现错误：{e}")
 def get_dayun_ages(start_age: int) -> List[int]:
