@@ -16,7 +16,7 @@
 """
 
 import sys
-from typing import Tuple, Optional, List, Any
+from typing import Tuple, Optional, List
 from datetime import datetime, timedelta
 import bazi_common
 from lunar_python import Solar, Lunar
@@ -24,13 +24,10 @@ from lunar_python import Solar, Lunar
 # --- 全局常量 ---
 DEBUG: bool = False
 CHART_COL_WIDTH: int = 14  # 统一所有排盘的列宽
-
-# --- 核心函数 ---
-
-def debug_print(*args: Any, **kwargs: Any) -> None:
-    """如果 DEBUG 为 True，则打印调试信息。"""
-    if DEBUG:
-        print(*args, **kwargs)
+ZHI_TO_HOUR = {
+    '子': 0, '丑': 2, '寅': 4, '卯': 6, '辰': 8, '巳': 10,
+    '午': 12, '未': 14, '申': 16, '酉': 18, '戌': 20, '亥': 22,
+}
 
 # 导入干支关系分析模块
 try:
@@ -104,7 +101,7 @@ def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int,
         {'name': '时柱', 'ganzhi': hour_pillar}
     ]
     day_master = day_pillar[0]
-    _display_bazi_chart(pillars_for_chart, day_master, gender)
+    bazi_common.display_bazi_chart(pillars_for_chart, day_master, gender)
     print()
 
     # 显示流年表格
@@ -128,11 +125,6 @@ def display_liunian_result(dayun_ganzhi: str, liunian_list: List[Tuple[str, int,
     relations = analyze_ganzhi_relations(year_pillar, month_pillar, day_pillar, hour_pillar, dayun_ganzhi)
     print(relations)
     print("-" * table_width)
-
-
-def _display_bazi_chart(pillars: List[dict], day_master: str, gender: str) -> None:
-    """Compatibility wrapper around the shared detailed chart renderer."""
-    bazi_common.display_bazi_chart(pillars, day_master, gender)
 
 
 def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_start_age: int,
@@ -221,7 +213,7 @@ def liunian_query_loop(dayun_list: List[str], dayun_years: List[int], rounded_st
                         {'name': '时柱', 'ganzhi': hour_pillar}
                     ]
                     day_master = day_pillar[0]
-                    _display_bazi_chart(pillars_for_chart, day_master, gender)
+                    bazi_common.display_bazi_chart(pillars_for_chart, day_master, gender)
                     print()
 
                     # 分析六柱关系
@@ -275,7 +267,7 @@ def display_dayun_result(year_pillar: str, month_pillar: str, day_pillar: str, h
         {'name': '时柱', 'ganzhi': hour_pillar}
     ]
     day_master = day_pillar[0]
-    _display_bazi_chart(pillars_for_chart, day_master, gender)
+    bazi_common.display_bazi_chart(pillars_for_chart, day_master, gender)
     
     # 添加原局干支关系分析
     print("\n【原局作用关系】")
@@ -351,29 +343,26 @@ def calc_bazi_from_lunar(year: int, month: int, day: int, hour: int) -> Tuple[st
 
 def calc_bazi_from_lunar_auto(year: int, month: int, day: int, hour: int) -> Tuple[str, str, str, str]:
     """
-    自动判断闰月并计算四柱八字
+    自动判断闰月并计算四柱八字。
+
+    正月优先；仅当普通月日期无效、且该年该月存在闰月时，才回退到闰月。
+    负数月份表示调用方已明确选择闰月。
     """
+    if month < 0:
+        return calc_bazi_from_lunar(year, month, day, hour)
+
     try:
-        from lunar_python import LunarYear  # type: ignore
-        leap_month = 0
+        return calc_bazi_from_lunar(year, month, day, hour)
+    except ValueError as regular_month_error:
         try:
+            from lunar_python import LunarYear  # type: ignore
             leap_month = LunarYear.fromYear(year).getLeapMonth()
-        except Exception:
-            leap_month = 0
-        # 若当年无闰月，或闰月与输入月份不同，则按非闰月处理
-        if leap_month == 0 or leap_month != month:
-            return calc_bazi_from_lunar(year, month, day, hour)
-        # 若当年该月为闰月：优先尝试非闰月，不存在则尝试闰月
-        try:
-            return calc_bazi_from_lunar(year, month, day, hour)
-        except ValueError:
-            return calc_bazi_from_lunar(year, month, day, hour)
-    except ImportError:
-        # 兼容旧版 lunar_python（无 LunarYear）
-        try:
-            return calc_bazi_from_lunar(year, month, day, hour)
-        except ValueError:
-            return calc_bazi_from_lunar(year, month, day, hour)
+        except (ImportError, AttributeError, ValueError):
+            raise regular_month_error
+
+        if leap_month != month:
+            raise regular_month_error
+        return calc_bazi_from_lunar(year, -month, day, hour)
 
 
 def get_date_info_from_lunar(year: int, month: int, day: int, hour: int) -> Tuple[str, str]:
@@ -408,12 +397,6 @@ def get_bazi_input_and_find_dates() -> Optional[Tuple[datetime, str]]:
     返回用户选择的日期时间和性别。
     """
     print("\n请输入四柱八字进行反查（例如：年柱输入“癸卯”，月柱输入“甲子”等）")
-    
-    # 地支与小时的映射关系 (取小时范围的中间值)
-    ZHI_TO_HOUR = {
-        '子': 0, '丑': 2, '寅': 4, '卯': 6, '辰': 8, '巳': 10,
-        '午': 12, '未': 14, '申': 16, '酉': 18, '戌': 20, '亥': 22
-    }
     
     # 获取并验证输入
     while True:
